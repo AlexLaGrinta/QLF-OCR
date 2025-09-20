@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <err.h>
 #include "ocr.h"
+#include "preprocessing.h"
 
 int main(int argc, char** argv)
 {
@@ -10,7 +11,10 @@ int main(int argc, char** argv)
         errx(1,"Missing path.");
     }
 
+    const char* inPath  = argv[1];
 
+    if (preprocess_image(inPath) != 0) return 1;
+    
 
     return EXIT_SUCCESS;
 }
