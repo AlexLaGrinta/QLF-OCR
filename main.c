@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <err.h>
-#include "ocr.h"
 #include "preprocessing.h"
 
 int main(int argc, char** argv)
