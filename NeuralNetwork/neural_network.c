@@ -184,6 +184,7 @@ int predict(NeuralNetwork* network, double* inputs)
     double max_value = *outputs;
     for (size_t i = 0; i < OUTPUT_SIZE; i++)
     {
+        //printf("%c : %f\n", (char)i +'A' ,outputs[i]);
         if (outputs[i] > max_value)
         {
             max_index = i;
@@ -206,18 +207,99 @@ static void u8_to_double_array(const uint8_t* in, size_t n, double* out)
 }
 
 
-void print_matrixx(double* matrix)
+
+void save_network_weights(NeuralNetwork* network, const char* path)
 {
-    for (int y = 0; y < 28; y++)
+    char file_path[32];
+
+    //strncat(file_path, path, 24);
+
+
+    snprintf(file_path, sizeof(file_path), "../temp/%s.bin", path);
+
+
+    FILE* f = fopen(file_path, "wb");
+
+    /*
+    double weights_input_hidden[INPUT_SIZE][HIDDEN_SIZE];
+    double biases_hidden[HIDDEN_SIZE];
+    double weights_hidden_output[HIDDEN_SIZE][OUTPUT_SIZE];
+    double biases_output[OUTPUT_SIZE];
+    */
+
+    for (int i = 0; i < INPUT_SIZE; i++)
     {
-        for (int x = 0; x < 28; x++)
+        for (int j = 0; j < HIDDEN_SIZE; j++)
         {
-            size_t i = (size_t)y * (size_t)28 + (size_t)x;
-            printf("%f ", matrix[i]);
+            double data = network->weights_input_hidden[i][j];
+            fwrite(&data, sizeof(double), 1, f);
         }
-        printf("\n");
     }
+
+    for (int j = 0; j < HIDDEN_SIZE; j++)
+    {
+        double data = network->biases_hidden[j];
+        fwrite(&data, sizeof(double), 1, f);
+    }
+
+    for (int i = 0; i < HIDDEN_SIZE; i++)
+    {
+        for (int j = 0; j < OUTPUT_SIZE; j++)
+        {
+            double data = network->weights_hidden_output[i][j];
+            fwrite(&data, sizeof(double), 1, f);
+        }
+    }
+
+    for (int j = 0; j < OUTPUT_SIZE; j++)
+    {
+        double data = network->biases_output[j];
+        fwrite(&data, sizeof(double), 1, f);
+    }
+
+    fclose(f);
+
+    printf("Weights saved to : %s\n", file_path);
 }
+
+
+void load_network_weights(NeuralNetwork* network, const char* path)
+{
+    FILE* f = fopen(path, "rb");
+
+    for (int i = 0; i < INPUT_SIZE; i++)
+    {
+        for (int j = 0; j < HIDDEN_SIZE; j++)
+        {
+            fread(&network->weights_input_hidden[i][j], sizeof(double), 1, f);
+        }
+    }
+
+    for (int j = 0; j < HIDDEN_SIZE; j++)
+    {
+        fread(&network->biases_hidden[j], sizeof(double), 1, f);
+    }
+
+    for (int i = 0; i < HIDDEN_SIZE; i++)
+    {
+        for (int j = 0; j < OUTPUT_SIZE; j++)
+        {
+            fread(&network->weights_hidden_output[i][j], sizeof(double), 1, f);
+        }
+    }
+
+    for (int j = 0; j < OUTPUT_SIZE; j++)
+    {
+        fread(&network->biases_output[j], sizeof(double), 1, f);
+    }
+
+    fclose(f);
+
+    printf("Weights successfully loaded from : %s\n", path);
+
+
+}
+
 
 
 void start_training_with_dataset(NeuralNetwork* network, const char* path)
@@ -270,7 +352,21 @@ int main()
 
     NeuralNetwork network;
 
-    start_training_with_dataset(&network, "../dataset/dataset_uppercase");
+    load_network_weights(&network, "../temp/network.bin");
+
+    BinaryMatrix mat = img_to_binary_matrix_strict10("000025.png");
+
+    double* inputs = malloc(sizeof(double) * INPUT_SIZE);
+
+    u8_to_double_array(mat.data,INPUT_SIZE, inputs);
+
+    int res = predict(&network, inputs);
+
+    printf("%c\n", res + 'A');
+
+    //start_training_with_dataset(&network, "../dataset/dataset_uppercase");
+
+    
 
     return EXIT_SUCCESS;
 }

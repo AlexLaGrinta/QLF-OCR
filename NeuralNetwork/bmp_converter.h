@@ -21,5 +21,6 @@ void print_matrix(BinaryMatrix matrix);
 BinaryMatrix img_to_binary_matrix_strict10(const char *path);
 LetterDataset load_dataset(const char* dataset_path);
 void free_dataset(LetterDataset* dataset);
+void print_matrix_double(double* matrix);
 
 #endif

@@ -33,6 +33,20 @@ void print_matrix(BinaryMatrix matrix)
 }
 
 
+void print_matrix_double(double* matrix)
+{
+    for (int y = 0; y < 28; y++)
+    {
+        for (int x = 0; x < 28; x++)
+        {
+            size_t i = (size_t)y * (size_t)28 + (size_t)x;
+            printf("%f ", matrix[i]);
+        }
+        printf("\n");
+    }
+}
+
+
 // noir=1, blanc=0
 BinaryMatrix img_to_binary_matrix_strict10(const char *path)
 {
