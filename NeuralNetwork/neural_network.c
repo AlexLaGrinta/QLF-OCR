@@ -52,6 +52,24 @@ void initialize_network(NeuralNetwork* network)
     
 }
 
+void softmax(double *logits, double *output, int output_size) {
+    double max_logit = logits[0];
+    for (int i = 1; i < output_size; i++) {
+        if (logits[i] > max_logit) {
+            max_logit = logits[i];
+        }
+    }
+
+    double sum = 0.0;
+    for (int i = 0; i < output_size; i++) {
+        sum += exp(logits[i] - max_logit);
+    }
+
+    for (int i = 0; i < output_size; i++) {
+        output[i] = exp(logits[i] - max_logit) / sum;
+    }
+}
+
 void forward_neural(NeuralNetwork* network, double* inputs, double* hidden, double* outputs)
 {
     for (int i = 0; i < HIDDEN_SIZE; i++)
@@ -71,8 +89,10 @@ void forward_neural(NeuralNetwork* network, double* inputs, double* hidden, doub
         {
             weights_hidden_sum += hidden[j] * network->weights_hidden_output[j][i];
         }
-        outputs[i] = sigmoid(weights_hidden_sum + network->biases_output[i]); 
+        outputs[i] = weights_hidden_sum + network->biases_output[i]; 
     }
+
+    softmax(outputs,outputs,OUTPUT_SIZE);
 }
 
 
@@ -354,7 +374,7 @@ int main()
 
     load_network_weights(&network, "../temp/network.bin");
 
-    BinaryMatrix mat = img_to_binary_matrix_strict10("000025.png");
+    BinaryMatrix mat = img_to_binary_matrix_strict10("000015.png");
 
     double* inputs = malloc(sizeof(double) * INPUT_SIZE);
 
@@ -363,10 +383,13 @@ int main()
     int res = predict(&network, inputs);
 
     printf("%c\n", res + 'A');
-
-    //start_training_with_dataset(&network, "../dataset/dataset_uppercase");
-
     
 
+    /*
+    start_training_with_dataset(&network, "../dataset/dataset_uppercase");
+
+    save_network_weights(&network, "mdr");
+
+    */
     return EXIT_SUCCESS;
 }
