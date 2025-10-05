@@ -98,6 +98,9 @@ int is_directory(const char* path) {
 
 // Charge le dataset complet
 LetterDataset load_dataset(const char* dataset_path) {
+
+    int total_samples = 0;
+
     LetterDataset dataset;
     dataset.matrices = calloc(26, sizeof(BinaryMatrix**));
     dataset.samples_per_letter = calloc(26, sizeof(int));
@@ -137,6 +140,7 @@ LetterDataset load_dataset(const char* dataset_path) {
                 if (strstr(subentry->d_name, ".png") != NULL ||
                     strstr(subentry->d_name, ".PNG") != NULL) {
                     sample_count++;
+                    total_samples++;
                 }
             }
 
@@ -171,6 +175,8 @@ LetterDataset load_dataset(const char* dataset_path) {
         }
     }
     closedir(dir);
+
+    printf("Successfully loaded %i samples from target dataset\n", total_samples);
     return dataset;
 }
 

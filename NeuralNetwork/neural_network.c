@@ -105,6 +105,16 @@ static inline double mse_sample(const double* y, const double* yhat, int n) {
     return s / n;
 }
 
+
+double cross_entropy(double *probabilities, int true_class, int output_size) {
+    double epsilon = 1e-10;
+    double p_true = probabilities[true_class];
+    p_true = fmax(fmin(p_true, 1.0 - epsilon), epsilon); 
+    return -log(p_true); 
+}
+
+
+
 void train_network(NeuralNetwork* network, SampleData** dataset, size_t dataset_size) {
     double* hidden  = (double*)malloc(HIDDEN_SIZE * sizeof(double));
     double* outputs = (double*)malloc(OUTPUT_SIZE * sizeof(double));
@@ -116,7 +126,7 @@ void train_network(NeuralNetwork* network, SampleData** dataset, size_t dataset_
     for (int epoch = 0; epoch < EPOCHS; ++epoch) {
         clock_t epoch_start = clock();  
 
-        double total_mse = 0.0;
+        double total_loss = 0.0;
         size_t correct = 0;
 
         for (size_t sample_index = 0; sample_index < dataset_size; ++sample_index) {
@@ -159,7 +169,7 @@ void train_network(NeuralNetwork* network, SampleData** dataset, size_t dataset_
                 network->biases_hidden[i] += LEARNING_RATE * delta_hidden[i];
 
             // Stats
-            total_mse += mse_sample(y, outputs, OUTPUT_SIZE);
+            total_loss += cross_entropy(outputs, s->expected_value, OUTPUT_SIZE);
 
             int pred = 0;
             double vmax = outputs[0];
@@ -178,11 +188,11 @@ void train_network(NeuralNetwork* network, SampleData** dataset, size_t dataset_
         int eta_seconds_remaining = (int)eta_seconds % 60;
 
         // print
-        double avg_mse = total_mse / (double)dataset_size;
+        double avg_mse = total_loss / (double)dataset_size;
         double acc = (double)correct / (double)dataset_size * 100.0;
 
         printf(
-            "Epoch %d/%d  |  MSE: %.6f  |  Acc: %.2f%%  |  ETA: %02dm%02ds\n",
+            "Epoch %d/%d  |  Loss: %.6f  |  Acc: %.2f%%  |  ETA: %02dm%02ds\n",
             epoch + 1, EPOCHS, avg_mse, acc, eta_minutes, eta_seconds_remaining
         );
     }
@@ -367,12 +377,61 @@ void start_training_with_dataset(NeuralNetwork* network, const char* path)
 
 
 
+
+void test_score_dataset(NeuralNetwork* network, const char* path)
+{
+    LetterDataset raw_dataset = load_dataset(path);
+
+    int dataset_size = 0;
+
+    for (int i = 0; i < OUTPUT_SIZE; i++)
+    {
+        dataset_size += raw_dataset.samples_per_letter[i];
+    }
+
+
+
+    SampleData** dataset = malloc(sizeof(*dataset) * dataset_size);
+    for (int k = 0; k < dataset_size; ++k) {
+        dataset[k] = malloc(sizeof(**dataset));
+        dataset[k]->pixels = malloc(sizeof(double) * INPUT_SIZE);
+    }
+
+
+    int count = 0;
+
+    for (int i = 0; i < OUTPUT_SIZE; i++)
+    {
+        for (int j = 0; j < raw_dataset.samples_per_letter[i]; j++)
+        {
+            dataset[count]->expected_value = i;
+            u8_to_double_array(raw_dataset.matrices[i][j]->data, INPUT_SIZE, dataset[count]->pixels);
+            count++;
+        }
+    }
+
+    int score = 0;
+    for (int i = 0; i < dataset_size; i++)
+    {
+        SampleData* sample = dataset[i];
+        int res = predict(network,sample->pixels);
+        printf("%c -> found %c\n", sample->expected_value+'A', res+'A');
+        score += (res == sample->expected_value);
+    }
+    printf("Score : %.2f%%", (double)score/dataset_size*100.0);
+}
+
+
+
+
 int main()
 {
 
     NeuralNetwork network;
 
-    load_network_weights(&network, "../temp/network.bin");
+    /*
+    load_network_weights(&network, "../temp/heybro.bin");
+
 
     BinaryMatrix mat = img_to_binary_matrix_strict10("000015.png");
 
@@ -383,13 +442,19 @@ int main()
     int res = predict(&network, inputs);
 
     printf("%c\n", res + 'A');
+    */
+
+
+    
+    
+    start_training_with_dataset(&network, "../dataset/training_data");
+
+    //save_network_weights(&network, "zgeg");
     
 
-    /*
-    start_training_with_dataset(&network, "../dataset/dataset_uppercase");
 
-    save_network_weights(&network, "mdr");
 
-    */
+
+    
     return EXIT_SUCCESS;
 }
