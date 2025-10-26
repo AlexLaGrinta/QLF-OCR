@@ -6,7 +6,7 @@
 #define INPUT_SIZE 784      
 #define HIDDEN_SIZE 128     
 #define OUTPUT_SIZE 26  
-#define EPOCHS 1000
+#define EPOCHS 10
 #define LEARNING_RATE 0.01
 
 typedef struct {
@@ -22,7 +22,5 @@ typedef struct
     int expected_value;
 } SampleData;
 
-
-double* initialize_hidden_layer(NeuralNetwork* network, BinaryMatrix* matrix);
 
 #endif

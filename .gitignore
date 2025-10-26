@@ -57,3 +57,5 @@ dkms.conf
 
 #dataset
 dataset_uppercase/
+training_data/
+dataset_new/
