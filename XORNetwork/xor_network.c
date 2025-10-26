@@ -78,11 +78,17 @@ void forward_neural(NeuralNetwork* network, double* inputs, double* hidden, doub
     //softmax(outputs,outputs,OUTPUT_SIZE);
 }
 
-double cross_entropy(double *probabilities, int true_class) {
-    double epsilon = 1e-10;
-    double p_true = probabilities[true_class];
-    p_true = fmax(fmin(p_true, 1.0 - epsilon), epsilon); 
-    return -log(p_true); 
+double mean_squared_error(double *outputs, int true_class) {
+    double target[OUTPUT_SIZE];
+    for (int i = 0; i < OUTPUT_SIZE; i++) target[i] = 0.0;
+    target[true_class] = 1.0;
+    
+    double mse = 0.0;
+    for (int i = 0; i < OUTPUT_SIZE; i++) {
+        double diff = target[i] - outputs[i];
+        mse += diff * diff;
+    }
+    return mse / OUTPUT_SIZE;
 }
 
 
@@ -101,7 +107,7 @@ void train_network(NeuralNetwork* network, SampleData** dataset, size_t dataset_
 
         for (size_t sample_index = 0; sample_index < dataset_size; ++sample_index) {
             SampleData* s = dataset[sample_index];
-            forward_neural(network, s->pixels, hidden, outputs);
+            forward_neural(network, s->elements, hidden, outputs);
 
             // Expected output 
             double y[OUTPUT_SIZE];
@@ -133,13 +139,13 @@ void train_network(NeuralNetwork* network, SampleData** dataset, size_t dataset_
 
             for (int i = 0; i < INPUT_SIZE; ++i) {
                 for (int j = 0; j < HIDDEN_SIZE; ++j)
-                    network->weights_input_hidden[i][j] += LEARNING_RATE * delta_hidden[j] * s->pixels[i];
+                    network->weights_input_hidden[i][j] += LEARNING_RATE * delta_hidden[j] * s->elements[i];
             }
             for (int i = 0; i < HIDDEN_SIZE; ++i)
                 network->biases_hidden[i] += LEARNING_RATE * delta_hidden[i];
 
             // Stats
-            total_loss += cross_entropy(outputs, s->expected_value);
+            total_loss += mean_squared_error(outputs, s->expected_value);
 
             int result = outputs[0] > outputs[1] ? 0 : 1;
             correct += (result == s->expected_value);
@@ -147,12 +153,12 @@ void train_network(NeuralNetwork* network, SampleData** dataset, size_t dataset_
         }
 
         // print
-        double avg_mse = total_loss / (double)dataset_size;
+        double avg_loss = total_loss / (double)dataset_size;
         double acc = (double)correct / (double)dataset_size * 100.0;
 
         printf(
             "Epoch %d/%d  |  Loss: %.6f  |  Acc: %.2f%%\n",
-            epoch + 1, EPOCHS, avg_mse, acc
+            epoch + 1, EPOCHS, avg_loss, acc
         );
     }
 
@@ -277,30 +283,30 @@ SampleData** initialize_sample()
 
     SampleData* data = malloc(sizeof(SampleData));
     data->expected_value = 1;
-    data->pixels = malloc(sizeof(double)*2);
-    data->pixels[0] = 0;
-    data->pixels[1] = 1;
+    data->elements = malloc(sizeof(double)*2);
+    data->elements[0] = 0;
+    data->elements[1] = 1;
     dataset[0] = data;
 
     SampleData* data1 = malloc(sizeof(SampleData));
     data1->expected_value = 1;
-    data1->pixels = malloc(sizeof(double)*2);
-    data1->pixels[0] = 1;
-    data1->pixels[1] = 0;
+    data1->elements = malloc(sizeof(double)*2);
+    data1->elements[0] = 1;
+    data1->elements[1] = 0;
     dataset[1] = data1;
 
     SampleData* data2 = malloc(sizeof(SampleData));
     data2->expected_value = 0;
-    data2->pixels = malloc(sizeof(double)*2);
-    data2->pixels[0] = 1;
-    data2->pixels[1] = 1;
+    data2->elements = malloc(sizeof(double)*2);
+    data2->elements[0] = 1;
+    data2->elements[1] = 1;
     dataset[2] = data2;
 
     SampleData* data3 = malloc(sizeof(SampleData));
     data3->expected_value = 0;
-    data3->pixels = malloc(sizeof(double)*2);
-    data3->pixels[0] = 0;
-    data3->pixels[1] = 0;
+    data3->elements = malloc(sizeof(double)*2);
+    data3->elements[0] = 0;
+    data3->elements[1] = 0;
     dataset[3] = data3;
 
     return dataset;
@@ -311,7 +317,7 @@ void free_sample(SampleData** data)
 {
     for (int i = 0; i < 4; i++)
     {
-        free(data[i]->pixels);  
+        free(data[i]->elements);  
         free(data[i]);          
     }
     free(data);                

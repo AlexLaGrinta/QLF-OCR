@@ -4,7 +4,7 @@
 #define INPUT_SIZE 2      
 #define HIDDEN_SIZE 2     
 #define OUTPUT_SIZE 2
-#define EPOCHS 100000
+#define EPOCHS 50000
 #define LEARNING_RATE 0.01
 
 typedef struct {
@@ -16,7 +16,7 @@ typedef struct {
 
 typedef struct
 {
-    double* pixels;
+    double* elements;
     int expected_value;
 } SampleData;
 
