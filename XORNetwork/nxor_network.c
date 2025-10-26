@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <time.h>
-#include "xor_network.h"
+#include "nxor_network.h"
 
 
 
@@ -282,28 +282,28 @@ SampleData** initialize_sample()
     SampleData** dataset = malloc(sizeof(SampleData*)*4);
 
     SampleData* data = malloc(sizeof(SampleData));
-    data->expected_value = 1;
+    data->expected_value = 0;
     data->elements = malloc(sizeof(double)*2);
     data->elements[0] = 0;
     data->elements[1] = 1;
     dataset[0] = data;
 
     SampleData* data1 = malloc(sizeof(SampleData));
-    data1->expected_value = 1;
+    data1->expected_value = 0;
     data1->elements = malloc(sizeof(double)*2);
     data1->elements[0] = 1;
     data1->elements[1] = 0;
     dataset[1] = data1;
 
     SampleData* data2 = malloc(sizeof(SampleData));
-    data2->expected_value = 0;
+    data2->expected_value = 1;
     data2->elements = malloc(sizeof(double)*2);
     data2->elements[0] = 1;
     data2->elements[1] = 1;
     dataset[2] = data2;
 
     SampleData* data3 = malloc(sizeof(SampleData));
-    data3->expected_value = 0;
+    data3->expected_value = 1;
     data3->elements = malloc(sizeof(double)*2);
     data3->elements[0] = 0;
     data3->elements[1] = 0;
@@ -324,32 +324,32 @@ void free_sample(SampleData** data)
 }
 
 
-void test_xor_network(NeuralNetwork* network)
+void test_nxor_network(NeuralNetwork* network)
 {
     double acc = 0;
 
     double inputs[2] = {1,0};
     int pred = predict(network, inputs);
-    printf("%i xor %i = %i\n", (int)inputs[0], (int)inputs[1] ,pred);
-    acc += (pred == 1);
+    printf("%i nxor %i = %i\n", (int)inputs[0], (int)inputs[1] ,pred);
+    acc += (pred == 0);
 
     inputs[0] = 0;
     inputs[1] = 1;
     pred = predict(network, inputs);
-    printf("%i xor %i = %i\n", (int)inputs[0], (int)inputs[1] ,pred);
-    acc += (pred == 1);
+    printf("%i nxor %i = %i\n", (int)inputs[0], (int)inputs[1] ,pred);
+    acc += (pred == 0);
 
     inputs[0] = 0;
     inputs[1] = 0;
     pred = predict(network, inputs);
-    printf("%i xor %i = %i\n", (int)inputs[0], (int)inputs[1] ,pred);
-    acc += (pred == 0);
+    printf("%i nxor %i = %i\n", (int)inputs[0], (int)inputs[1] ,pred);
+    acc += (pred == 1);
 
     inputs[0] = 1;
     inputs[1] = 1;
     pred = predict(network, inputs);
-    printf("%i xor %i = %i\n", (int)inputs[0], (int)inputs[1] ,pred);
-    acc += (pred == 0);
+    printf("%i nxor %i = %i\n", (int)inputs[0], (int)inputs[1] ,pred);
+    acc += (pred == 1);
 
     printf("Accuracy : %.2f%%", (acc/4)*100);
 
@@ -374,7 +374,7 @@ int main()
 
     free_sample(data);
 
-    test_xor_network(&network);
+    test_nxor_network(&network);
 
     //save_network_weights(&network,"xor");
 

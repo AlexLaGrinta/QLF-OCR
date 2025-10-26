@@ -1,5 +1,5 @@
-#ifndef XOR_NETWORK_H
-#define XOR_NETWORK_H
+#ifndef NXOR_NETWORK_H
+#define NXOR_NETWORK_H
 
 #define INPUT_SIZE 2      
 #define HIDDEN_SIZE 2     
