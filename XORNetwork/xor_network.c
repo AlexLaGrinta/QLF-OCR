@@ -141,11 +141,9 @@ void train_network(NeuralNetwork* network, SampleData** dataset, size_t dataset_
             // Stats
             total_loss += cross_entropy(outputs, s->expected_value);
 
-            int pred = 0;
-            double vmax = outputs[0];
-            for (int j = 1; j < OUTPUT_SIZE; ++j)
-                if (outputs[j] > vmax) { vmax = outputs[j]; pred = j; }
-            if (pred == s->expected_value) ++correct;
+            int result = outputs[0] > outputs[1] ? 0 : 1;
+            correct += (result == s->expected_value);
+
         }
 
         // print
