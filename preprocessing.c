@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
+#include <math.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
@@ -55,11 +57,14 @@ int preprocess_image(const char* path)
     // 1) Niveaux de gris
     grayscale_inplace(img);
 
-    // 2) Seuil d'Otsu
+    // 2) Filtre médian pour débruitage
+    median_filter(img);
+
+    // 3) Seuil d'Otsu
     uint8_t th = otsu_threshold(img);
     fprintf(stdout, "Otsu threshold = %u\n", th);
 
-    // 3) Binarisation (option inversion via --invert)
+    // 4) Binarisation (option inversion via --invert)
     threshold_inplace(img, th, 0);
 
     if (SDL_SaveBMP(img, outPath) != 0){
@@ -193,5 +198,86 @@ void threshold_inplace(SDL_Surface* s, uint8_t th, int invert){
             row[x] = Av | Rv | Gv | Bv;
         }
     }
+    SDL_UnlockSurface(s);
+}
+
+// Comparateur pour qsort
+static int compare_uint8(const void *a, const void *b) {
+    return (*(uint8_t*)a - *(uint8_t*)b);
+}
+
+// Filtre médian efficace pour suppression du bruit
+void median_filter(SDL_Surface *s) {
+    if (!s) return;
+
+    SDL_LockSurface(s);
+    
+    int w = s->w;
+    int h = s->h;
+    SDL_PixelFormat* f = s->format;
+    
+    // Créer une copie de l'image
+    size_t img_size = h * s->pitch;
+    uint8_t* backup = malloc(img_size);
+    memcpy(backup, s->pixels, img_size);
+    
+    // Appliquer le filtre médian sur toute l'image
+    for (int y = 1; y < h - 1; y++) {
+        for (int x = 1; x < w - 1; x++) {
+            // Lire pixel original
+            uint32_t* src_row = (uint32_t*)(backup + y * s->pitch);
+            uint32_t pixel = src_row[x];
+            uint32_t R = (pixel & f->Rmask) >> f->Rshift;
+            if (f->Rloss) R >>= f->Rloss;
+            uint8_t original = (uint8_t)R;
+            
+            // Collecter fenêtre 3x3
+            uint8_t values[9];
+            int k = 0;
+            for (int dy = -1; dy <= 1; dy++) {
+                uint32_t* row = (uint32_t*)(backup + (y + dy) * s->pitch);
+                for (int dx = -1; dx <= 1; dx++) {
+                    uint32_t npixel = row[x + dx];
+                    uint32_t nR = (npixel & f->Rmask) >> f->Rshift;
+                    if (f->Rloss) nR >>= f->Rloss;
+                    values[k++] = (uint8_t)nR;
+                }
+            }
+            
+            // Trier et calculer statistiques
+            qsort(values, 9, sizeof(uint8_t), compare_uint8);
+            uint8_t min_val = values[0];
+            uint8_t max_val = values[8];
+            uint8_t median = values[4];
+            
+            uint8_t new_value;
+            int range = max_val - min_val;
+            
+            // Algorithme de débruitage efficace
+            if (range > 5) {
+                // Si le pixel actuel est un extrême, c'est probablement du bruit
+                if (original == min_val || original == max_val) {
+                    new_value = median;
+                } else {
+                    // Tester la déviation par rapport à la médiane
+                    int deviation = abs((int)original - (int)median);
+                    if (deviation > 10) {
+                        new_value = median;  // Pixel trop différent -> bruit
+                    } else {
+                        new_value = original;  // Pixel OK
+                    }
+                }
+            } else {
+                new_value = original;  // Zone homogène
+            }
+            
+            // Écrire le résultat
+            uint32_t* dst_row = (uint32_t*)((uint8_t*)s->pixels + y * s->pitch);
+            uint32_t alpha = 0xFF << f->Ashift;
+            dst_row[x] = alpha | (new_value << f->Rshift) | (new_value << f->Gshift) | (new_value << f->Bshift);
+        }
+    }
+    
+    free(backup);
     SDL_UnlockSurface(s);
 }
