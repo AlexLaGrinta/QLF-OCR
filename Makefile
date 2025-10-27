@@ -1,7 +1,7 @@
 #Makefile
 CC      := gcc
 TARGET  := ocr
-SRC     := main.c preprocessing.c
+SRC     := main.c preprocessing.c segmentation/char_segmentation.c segmentation/image_segmentation.c
 OBJ     := $(SRC:.c=.o)
 
 CFLAGS  := -std=c11 -Wall -Wextra -O2 $(shell pkg-config --cflags sdl2 SDL2_image)
@@ -20,5 +20,8 @@ $(TARGET): $(OBJ)
 
 clean:
 	rm -f $(OBJ) $(TARGET)
+	rm -rf chars
+	rm output_with_rectangles.bmp
+	rm temp/output.bmp
 
 
