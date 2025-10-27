@@ -9,8 +9,6 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include "preprocessing.h"
-#include "segmentation/char_segmentation.h"
-#include "segmentation/image_segmentation.h"
 
 
 
@@ -60,7 +58,7 @@ int preprocess_image(const char* path)
     grayscale_inplace(img);
 
     // 2) Filtre médian pour débruitage
-    //median_filter(img);
+    median_filter(img);
 
     // 3) Seuil d'Otsu
     uint8_t th = otsu_threshold(img);
@@ -75,51 +73,11 @@ int preprocess_image(const char* path)
         return 1;
     }
 
-    // Convertir en BinaryImage pour la segmentation
-    BinaryImage* bin = create_binary_image(img);
-    if (!bin) {
-        fprintf(stderr, "Failed to create BinaryImage\n");
-        SDL_FreeSurface(img); IMG_Quit(); SDL_Quit();
-        return 1;
-    }
-
-    // Segmenter les caractères
-    int num_chars = 0;
-    Character* chars = find_characters(bin, &num_chars);
-    if (!chars) {
-        fprintf(stderr, "Failed to find characters\n");
-        free_binary_image(bin);
-        SDL_FreeSurface(img);
-        IMG_Quit();
-        SDL_Quit();
-        return 1;
-    }
-    printf("Found %d characters\n", num_chars);
-
-    // Sauvegarder chaque caractère
-    for (int i = 0; i < num_chars; i++) {
-        char filename[32];
-        snprintf(filename, sizeof(filename), "char_%d_%d", chars[i].x, chars[i].y);
-        save_character(filename, &chars[i]);
-
-        // Dessiner un rectangle autour du caractère sur l'image originale
-        draw_rectangle(img, chars[i].x, chars[i].y, chars[i].width, chars[i].height, 255, 0, 0);
-    }
-
-    // Sauvegarder l'image avec les rectangles
-    if (SDL_SaveBMP(img, "output_with_rectangles.bmp") != 0) {
-        fprintf(stderr, "Failed to save output_with_rectangles.bmp: %s\n", SDL_GetError());
-    }
-
-    // Libérer la mémoire
-    free_characters(chars, num_chars);
-    free_binary_image(bin);
     SDL_FreeSurface(img);
     IMG_Quit();
     SDL_Quit();
 
     return EXIT_SUCCESS;
-
 
 }
 
@@ -249,7 +207,7 @@ static int compare_uint8(const void *a, const void *b) {
 }
 
 // Filtre médian efficace pour suppression du bruit
-/*void median_filter(SDL_Surface *s) {
+void median_filter(SDL_Surface *s) {
     if (!s) return;
 
     SDL_LockSurface(s);
@@ -323,5 +281,3 @@ static int compare_uint8(const void *a, const void *b) {
     free(backup);
     SDL_UnlockSurface(s);
 }
-*/
-

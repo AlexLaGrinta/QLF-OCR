@@ -136,7 +136,7 @@ void save_character(const char* filename, const Character* ch) {
 
     FILE* f = fopen(path, "wb");
     if (!f) {
-        perror("fopen");
+        perror("salam");
         return;
     }
 
