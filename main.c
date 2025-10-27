@@ -13,7 +13,6 @@ int main(int argc, char** argv)
     const char* inPath  = argv[1];
 
     if (preprocess_image(inPath) != 0) return 1;
-    
 
     return EXIT_SUCCESS;
 }
