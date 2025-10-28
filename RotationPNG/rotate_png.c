@@ -2,10 +2,35 @@
 #include <stdlib.h>
 #include <math.h>
 #include <png.h>
+#include <stdint.h>
 
 typedef struct {
     png_byte r, g, b, a;
 } rgba_t;
+
+#pragma pack(push, 1)
+typedef struct {
+    uint16_t bfType;
+    uint32_t bfSize;
+    uint16_t bfReserved1;
+    uint16_t bfReserved2;
+    uint32_t bfOffBits;
+} BITMAPFILEHEADER;
+
+typedef struct {
+    uint32_t biSize;
+    int32_t biWidth;
+    int32_t biHeight;
+    uint16_t biPlanes;
+    uint16_t biBitCount;
+    uint32_t biCompression;
+    uint32_t biSizeImage;
+    int32_t biXPelsPerMeter;
+    int32_t biYPelsPerMeter;
+    uint32_t biClrUsed;
+    uint32_t biClrImportant;
+} BITMAPINFOHEADER;
+#pragma pack(pop)
 
 rgba_t **load_png(const char *filename, int *width, int *height) {
     FILE *fp = fopen(filename, "rb");
@@ -46,64 +71,83 @@ rgba_t **load_png(const char *filename, int *width, int *height) {
     return rows;
 }
 
-int save_png(const char *filename, rgba_t **data, int width, int height) {
-    FILE *fp = fopen(filename, "wb");
-    if (!fp) return 0;
-    png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-    if (!png) return 0;
-    png_infop info = png_create_info_struct(png);
-    if (!info) {
-        png_destroy_write_struct(&png, NULL);
-        fclose(fp);
-        return 0;
-    }
-    if (setjmp(png_jmpbuf(png))) {
-        png_destroy_write_struct(&png, &info);
-        fclose(fp);
-        return 0;
-    }
-    png_init_io(png, fp);
-    png_set_IHDR(png, info, width, height, 8,
-                 PNG_COLOR_TYPE_RGBA, PNG_INTERLACE_NONE,
-                 PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
-    png_write_info(png, info);
-    png_write_image(png, (png_bytepp)data);
-    png_write_end(png, NULL);
-    fclose(fp);
-    png_destroy_write_struct(&png, &info);
-    return 1;
-}
-
-rgba_t **rotate_image(rgba_t **src, int width, int height, double angle_deg, int *new_w, int *new_h) {
+rgba_t **rotate_image_fixed(rgba_t **src, int width, int height, double angle_deg) {
     double angle = angle_deg * M_PI / 180.0;
     double cos_a = cos(angle), sin_a = sin(angle);
-    int w_out = (int)(fabs(width * cos_a) + fabs(height * sin_a));
-    int h_out = (int)(fabs(width * sin_a) + fabs(height * cos_a));
-    *new_w = w_out;
-    *new_h = h_out;
-    rgba_t **dst = malloc(sizeof(rgba_t *) * h_out);
-    for (int y = 0; y < h_out; y++) dst[y] = calloc(w_out, sizeof(rgba_t));
+
+    rgba_t **dst = malloc(sizeof(rgba_t *) * height);
+    for (int y = 0; y < height; y++) dst[y] = calloc(width, sizeof(rgba_t));
+
     double cx = width / 2.0;
     double cy = height / 2.0;
-    double ncx = w_out / 2.0;
-    double ncy = h_out / 2.0;
-    for (int y = 0; y < h_out; y++) {
-        for (int x = 0; x < w_out; x++) {
-            double xr = (x - ncx) * cos_a + (y - ncy) * sin_a + cx;
-            double yr = -(x - ncx) * sin_a + (y - ncy) * cos_a + cy;
-            int xi = (int)xr;
-            int yi = (int)yr;
-            if (xi >= 0 && xi < width && yi >= 0 && yi < height)
-                dst[y][x] = src[yi][xi];
-            else {
-                dst[y][x].r = 255;
-                dst[y][x].g = 255;
-                dst[y][x].b = 255;
-                dst[y][x].a = 0;
+
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            double xr = (x - cx) * cos_a + (y - cy) * sin_a + cx;
+            double yr = -(x - cx) * sin_a + (y - cy) * cos_a + cy;
+
+            int x0 = (int)floor(xr);
+            int y0 = (int)floor(yr);
+            int x1 = x0 + 1;
+            int y1 = y0 + 1;
+
+            double dx = xr - x0;
+            double dy = yr - y0;
+
+            rgba_t c = {255, 255, 255, 255}; // fond blanc
+
+            if (x0 >= 0 && y0 >= 0 && x1 < width && y1 < height) {
+                rgba_t p00 = src[y0][x0];
+                rgba_t p10 = src[y0][x1];
+                rgba_t p01 = src[y1][x0];
+                rgba_t p11 = src[y1][x1];
+                double w00 = (1 - dx) * (1 - dy);
+                double w10 = dx * (1 - dy);
+                double w01 = (1 - dx) * dy;
+                double w11 = dx * dy;
+                c.r = (png_byte)(p00.r * w00 + p10.r * w10 + p01.r * w01 + p11.r * w11);
+                c.g = (png_byte)(p00.g * w00 + p10.g * w10 + p01.g * w01 + p11.g * w11);
+                c.b = (png_byte)(p00.b * w00 + p10.b * w10 + p01.b * w01 + p11.b * w11);
             }
+            dst[y][x] = c;
         }
     }
     return dst;
+}
+
+int save_bmp(const char *filename, rgba_t **data, int width, int height) {
+    FILE *f = fopen(filename, "wb");
+    if (!f) return 0;
+    int row_padded = (width * 3 + 3) & (~3);
+    int filesize = 54 + row_padded * height;
+    BITMAPFILEHEADER bfh = {0};
+    BITMAPINFOHEADER bih = {0};
+    bfh.bfType = 0x4D42;
+    bfh.bfSize = filesize;
+    bfh.bfOffBits = 54;
+    bih.biSize = 40;
+    bih.biWidth = width;
+    bih.biHeight = -height;
+    bih.biPlanes = 1;
+    bih.biBitCount = 24;
+    bih.biCompression = 0;
+    bih.biSizeImage = row_padded * height;
+    fwrite(&bfh, sizeof(bfh), 1, f);
+    fwrite(&bih, sizeof(bih), 1, f);
+    unsigned char *row = malloc(row_padded);
+    for (int y = 0; y < height; y++) {
+        int p = 0;
+        for (int x = 0; x < width; x++) {
+            row[p++] = data[y][x].b;
+            row[p++] = data[y][x].g;
+            row[p++] = data[y][x].r;
+        }
+        while (p < row_padded) row[p++] = 0;
+        fwrite(row, row_padded, 1, f);
+    }
+    free(row);
+    fclose(f);
+    return 1;
 }
 
 void free_image(rgba_t **img, int height) {
@@ -124,13 +168,13 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Erreur chargement PNG\n");
         return 1;
     }
-    int new_w, new_h;
-    rgba_t **rotated = rotate_image(img, width, height, angle, &new_w, &new_h);
-    if (!save_png("output.png", rotated, new_w, new_h))
-        fprintf(stderr, "Erreur enregistrement PNG\n");
+    rgba_t **rotated = rotate_image_fixed(img, width, height, angle);
+    if (!save_bmp("output.bmp", rotated, width, height))
+        fprintf(stderr, "Erreur enregistrement BMP\n");
     else
-        printf("Image tournée enregistrée dans 'output.png'\n");
+        printf("Image tournée (dimensions conservées) enregistrée dans 'output.bmp'\n");
     free_image(img, height);
-    free_image(rotated, new_h);
+    free_image(rotated, height);
     return 0;
 }
+
