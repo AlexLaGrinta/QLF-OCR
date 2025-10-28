@@ -230,13 +230,6 @@ int predict(NeuralNetwork* network, double* inputs)
 
 
 
-static void u8_to_double_array(const uint8_t* in, size_t n, double* out)
-{
-    for (size_t i = 0; i < n; ++i)
-        out[i] = (double)(in[i] != 0); // 0 -> 0.0, 1 -> 1.0 
-}
-
-
 
 void save_network_weights(NeuralNetwork* network, const char* path)
 {
@@ -334,45 +327,29 @@ void load_network_weights(NeuralNetwork* network, const char* path)
 
 void start_training_with_dataset(NeuralNetwork* network, const char* path)
 {
+    DoubleDataset raw_dataset = load_double_dataset(path);
 
-    LetterDataset raw_dataset = load_dataset(path);
-
-    int dataset_size = 0;
-
+    size_t dataset_size = 0;
     for (int i = 0; i < OUTPUT_SIZE; i++)
     {
         dataset_size += raw_dataset.samples_per_letter[i];
     }
 
-
-
-    SampleData** dataset = malloc(sizeof(*dataset) * dataset_size);
-    for (int k = 0; k < dataset_size; ++k) {
-        dataset[k] = malloc(sizeof(**dataset));
-        dataset[k]->pixels = malloc(sizeof(double) * INPUT_SIZE);
-    }
-
-
-    int count = 0;
-
-    for (int i = 0; i < OUTPUT_SIZE; i++)
-    {
-        for (int j = 0; j < raw_dataset.samples_per_letter[i]; j++)
-        {
-            dataset[count]->expected_value = i;
-            u8_to_double_array(raw_dataset.matrices[i][j]->data, INPUT_SIZE, dataset[count]->pixels);
-            count++;
-        }
+    SampleData** dataset = double_dataset_to_samples(&raw_dataset, &dataset_size);
+    if (!dataset) {
+        fprintf(stderr, "Failed to convert dataset to samples\n");
+        free_double_dataset(&raw_dataset);
+        return;
     }
 
     train_network(network, dataset, dataset_size);
 
-    for (int k = 0; k < dataset_size; ++k) {
+    for (size_t k = 0; k < dataset_size; ++k) {
         free(dataset[k]->pixels);
         free(dataset[k]);
     }
     free(dataset);
-    free_dataset(&raw_dataset);
+    free_double_dataset(&raw_dataset);
 }
 
 
@@ -380,45 +357,37 @@ void start_training_with_dataset(NeuralNetwork* network, const char* path)
 
 void test_score_dataset(NeuralNetwork* network, const char* path)
 {
-    LetterDataset raw_dataset = load_dataset(path);
+    DoubleDataset raw_dataset = load_double_dataset(path);
 
-    int dataset_size = 0;
-
+    size_t dataset_size = 0;
     for (int i = 0; i < OUTPUT_SIZE; i++)
     {
         dataset_size += raw_dataset.samples_per_letter[i];
     }
 
-
-
-    SampleData** dataset = malloc(sizeof(*dataset) * dataset_size);
-    for (int k = 0; k < dataset_size; ++k) {
-        dataset[k] = malloc(sizeof(**dataset));
-        dataset[k]->pixels = malloc(sizeof(double) * INPUT_SIZE);
-    }
-
-
-    int count = 0;
-
-    for (int i = 0; i < OUTPUT_SIZE; i++)
-    {
-        for (int j = 0; j < raw_dataset.samples_per_letter[i]; j++)
-        {
-            dataset[count]->expected_value = i;
-            u8_to_double_array(raw_dataset.matrices[i][j]->data, INPUT_SIZE, dataset[count]->pixels);
-            count++;
-        }
+    SampleData** dataset = double_dataset_to_samples(&raw_dataset, &dataset_size);
+    if (!dataset) {
+        fprintf(stderr, "Failed to convert dataset to samples\n");
+        free_double_dataset(&raw_dataset);
+        return;
     }
 
     int score = 0;
-    for (int i = 0; i < dataset_size; i++)
+    for (size_t i = 0; i < dataset_size; i++)
     {
         SampleData* sample = dataset[i];
-        int res = predict(network,sample->pixels);
+        int res = predict(network, sample->pixels);
         printf("%c -> found %c\n", sample->expected_value+'A', res+'A');
         score += (res == sample->expected_value);
     }
     printf("Score : %.2f%%", (double)score/dataset_size*100.0);
+
+    for (size_t k = 0; k < dataset_size; ++k) {
+        free(dataset[k]->pixels);
+        free(dataset[k]);
+    }
+    free(dataset);
+    free_double_dataset(&raw_dataset);
 }
 
 
@@ -429,25 +398,21 @@ int main()
 
     NeuralNetwork network;
 
-    /*
+    
     load_network_weights(&network, "../temp/heybro.bin");
 
 
-    BinaryMatrix mat = img_to_binary_matrix_strict10("000015.png");
-
-    double* inputs = malloc(sizeof(double) * INPUT_SIZE);
-
-    u8_to_double_array(mat.data,INPUT_SIZE, inputs);
+    double* inputs = img_to_binary_matrix("000015.png");
 
     int res = predict(&network, inputs);
 
-    printf("%c\n", res + 'A');
-    */
+    printf("%c\n", res+'A');
 
+    free(inputs);
 
+    //test_score_dataset(&network, "../dataset/dataset_uppercase");
     
-    
-    start_training_with_dataset(&network, "../dataset/training_data");
+    //start_training_with_dataset(&network, "../dataset/training_data");
 
     //save_network_weights(&network, "zgeg");
     

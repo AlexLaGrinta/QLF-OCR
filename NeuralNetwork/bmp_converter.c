@@ -5,6 +5,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <string.h>
 #include "bmp_converter.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
@@ -19,19 +20,6 @@ static int is_bmp_ext(const char *path) {
 
 }
 
-void print_matrix(BinaryMatrix matrix)
-{
-    for (int y = 0; y < matrix.h; y++)
-    {
-        for (int x = 0; x < matrix.w; x++)
-        {
-            size_t i = (size_t)y * (size_t)matrix.w + (size_t)x;
-            printf("%i ", matrix.data[i]);
-        }
-        printf("\n");
-    }
-}
-
 
 void print_matrix_double(double* matrix)
 {
@@ -40,54 +28,68 @@ void print_matrix_double(double* matrix)
         for (int x = 0; x < 28; x++)
         {
             size_t i = (size_t)y * (size_t)28 + (size_t)x;
-            printf("%f ", matrix[i]);
+            printf("%.0f ", matrix[i]);
         }
         printf("\n");
     }
 }
 
-
-// noir=1, blanc=0
-BinaryMatrix img_to_binary_matrix_strict10(const char *path)
+// Convertit une image PNG/BMP en matrice double* 28x28 binarisée (0 ou 1)
+double* img_to_binary_matrix(const char *path)
 {
-    BinaryMatrix out = (BinaryMatrix){0,0,NULL};
-    if (!path) return out;
+    if (!path) return NULL;
 
     SDL_Surface *src = is_bmp_ext(path) ? SDL_LoadBMP(path) : IMG_Load(path);
     if (!src) {
         fprintf(stderr, "Loading failed: %s\n", is_bmp_ext(path) ? SDL_GetError() : IMG_GetError());
-        return out;
+        return NULL;
     }
+    
     SDL_Surface *rgba = SDL_ConvertSurfaceFormat(src, SDL_PIXELFORMAT_RGBA32, 0);
     SDL_FreeSurface(src);
     if (!rgba) {
         fprintf(stderr, "Convert failed: %s\n", SDL_GetError());
-        return out;
+        return NULL;
     }
 
-    out.w = rgba->w;
-    out.h = rgba->h;
-    out.data = (uint8_t*)malloc((size_t)out.w * (size_t)out.h);
-    if (!out.data) {
+    // Allouer le tableau 28x28 = 784 éléments
+    double* matrix = (double*)malloc(28 * 28 * sizeof(double));
+    if (!matrix) {
         fprintf(stderr, "Allocation failed\n");
         SDL_FreeSurface(rgba);
-        out.w = out.h = 0;
-        return out;
+        return NULL;
     }
 
-    for (int y = 0; y < out.h; ++y) {
-        const uint32_t *px = (const uint32_t*)((const uint8_t*)rgba->pixels + (size_t)y * (size_t)rgba->pitch);
-        for (int x = 0; x < out.w; ++x) {
+    // Redimensionner l'image à 28x28 si nécessaire et binariser
+    SDL_Surface *resized = SDL_CreateRGBSurface(0, 28, 28, 32, 0, 0, 0, 0);
+    if (!resized) {
+        fprintf(stderr, "Resize surface creation failed: %s\n", SDL_GetError());
+        free(matrix);
+        SDL_FreeSurface(rgba);
+        return NULL;
+    }
+    
+    SDL_BlitScaled(rgba, NULL, resized, NULL);
+    SDL_FreeSurface(rgba);
+
+    // Convertir en matrice binaire (stockage linéaire)
+    for (int y = 0; y < 28; y++) {
+        const uint32_t *px = (const uint32_t*)((const uint8_t*)resized->pixels + (size_t)y * (size_t)resized->pitch);
+        for (int x = 0; x < 28; x++) {
             uint8_t r, g, b, a;
-            SDL_GetRGBA(px[x], rgba->format, &r, &g, &b, &a);
-            // Image N&B stricte → R=G=B∈{0,255}
-            out.data[(size_t)y * (size_t)out.w + (size_t)x] = (r == 0) ? 1 : 0; // noir=1, blanc=0
+            SDL_GetRGBA(px[x], resized->format, &r, &g, &b, &a);
+            // Binarisation : noir=1.0, blanc=0.0
+            // Index linéaire : y * 28 + x
+            matrix[y * 28 + x] = (r == 0) ? 1.0 : 0.0;
         }
     }
 
-    SDL_FreeSurface(rgba);
-    return out;
+    SDL_FreeSurface(resized);
+    return matrix;
 }
+
+
+
 
 
 // Vérifie si un chemin est un dossier
@@ -96,13 +98,32 @@ int is_directory(const char* path) {
     return (stat(path, &statbuf) == 0) && S_ISDIR(statbuf.st_mode);
 }
 
-// Charge le dataset complet
-LetterDataset load_dataset(const char* dataset_path) {
 
+
+// Libère toute la mémoire allouée pour DoubleDataset
+void free_double_dataset(DoubleDataset* dataset) {
+    for (int i = 0; i < 26; i++) {
+        if (dataset->matrices[i]) {
+            for (int j = 0; j < dataset->samples_per_letter[i]; j++) {
+                if (dataset->matrices[i][j]) {
+                    free(dataset->matrices[i][j]);
+                }
+            }
+            free(dataset->matrices[i]);
+        }
+    }
+    free(dataset->matrices);
+    free(dataset->samples_per_letter);
+    dataset->matrices = NULL;
+    dataset->samples_per_letter = NULL;
+}
+
+// Charge le dataset complet directement en double*
+DoubleDataset load_double_dataset(const char* dataset_path) {
     int total_samples = 0;
 
-    LetterDataset dataset;
-    dataset.matrices = calloc(26, sizeof(BinaryMatrix**));
+    DoubleDataset dataset;
+    dataset.matrices = calloc(26, sizeof(double***));
     dataset.samples_per_letter = calloc(26, sizeof(int));
 
     DIR* dir = opendir(dataset_path);
@@ -150,7 +171,7 @@ LetterDataset load_dataset(const char* dataset_path) {
             }
 
             dataset.samples_per_letter[letter_index] = sample_count;
-            dataset.matrices[letter_index] = calloc(sample_count, sizeof(BinaryMatrix*));
+            dataset.matrices[letter_index] = calloc(sample_count, sizeof(double*));
 
             // Re-parcourir pour charger les images
             rewinddir(subdir);
@@ -163,11 +184,11 @@ LetterDataset load_dataset(const char* dataset_path) {
                     char img_path[512];
                     snprintf(img_path, sizeof(img_path), "%s/%s", subdir_path, subentry->d_name);
 
-                    // Charger et convertir l'image
-                    dataset.matrices[letter_index][sample_idx] =
-                        malloc(sizeof(BinaryMatrix));
-                    *dataset.matrices[letter_index][sample_idx] =
-                        img_to_binary_matrix_strict10(img_path);
+                    // Charger directement en double* avec img_to_binary_matrix
+                    dataset.matrices[letter_index][sample_idx] = img_to_binary_matrix(img_path);
+                    if (!dataset.matrices[letter_index][sample_idx]) {
+                        fprintf(stderr, "Failed to load image: %s\n", img_path);
+                    }
                     sample_idx++;
                 }
             }
@@ -176,25 +197,56 @@ LetterDataset load_dataset(const char* dataset_path) {
     }
     closedir(dir);
 
-    printf("Successfully loaded %i samples from target dataset\n", total_samples);
+    printf("Successfully loaded %i samples as double matrices from target dataset\n", total_samples);
     return dataset;
 }
 
-// Libère toute la mémoire allouée
-void free_dataset(LetterDataset* dataset) {
+// Convertit un DoubleDataset en SampleData** sans conversion uint8_t -> double
+SampleData** double_dataset_to_samples(DoubleDataset* dataset, size_t* out_count) {
+    if (!dataset || !out_count) return NULL;
+
+    // Compter le nombre total d'échantillons
+    *out_count = 0;
     for (int i = 0; i < 26; i++) {
-        if (dataset->matrices[i]) {
-            for (int j = 0; j < dataset->samples_per_letter[i]; j++) {
-                if (dataset->matrices[i][j]) {
-                    free(dataset->matrices[i][j]->data);
-                    free(dataset->matrices[i][j]);
+        *out_count += dataset->samples_per_letter[i];
+    }
+
+    // Allouer le tableau de SampleData
+    SampleData** samples = malloc(*out_count * sizeof(SampleData*));
+    if (!samples) return NULL;
+
+    // Allouer chaque SampleData et copier directement les données double*
+    size_t sample_idx = 0;
+    for (int letter = 0; letter < 26; letter++) {
+        for (int j = 0; j < dataset->samples_per_letter[letter]; j++) {
+            samples[sample_idx] = malloc(sizeof(SampleData));
+            if (!samples[sample_idx]) {
+                // Libérer en cas d'erreur
+                for (size_t k = 0; k < sample_idx; k++) {
+                    free(samples[k]->pixels);
+                    free(samples[k]);
                 }
+                free(samples);
+                return NULL;
             }
-            free(dataset->matrices[i]);
+
+            samples[sample_idx]->expected_value = letter;
+            samples[sample_idx]->pixels = malloc(INPUT_SIZE * sizeof(double));
+            if (!samples[sample_idx]->pixels) {
+                free(samples[sample_idx]);
+                for (size_t k = 0; k < sample_idx; k++) {
+                    free(samples[k]->pixels);
+                    free(samples[k]);
+                }
+                free(samples);
+                return NULL;
+            }
+
+            // Copier directement les données double* (pas de conversion nécessaire)
+            memcpy(samples[sample_idx]->pixels, dataset->matrices[letter][j], INPUT_SIZE * sizeof(double));
+            sample_idx++;
         }
     }
-    free(dataset->matrices);
-    free(dataset->samples_per_letter);
-    dataset->matrices = NULL;
-    dataset->samples_per_letter = NULL;
+
+    return samples;
 }

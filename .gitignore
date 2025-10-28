@@ -59,3 +59,4 @@ dkms.conf
 dataset_uppercase/
 training_data/
 dataset_new/
+segmentation/chars/
