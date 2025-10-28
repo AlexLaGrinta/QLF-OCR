@@ -26,6 +26,10 @@ int perform_segmentation(const char *path)
         return 1;
     }
 
+    // Encadrer la grille de lettres et la liste des mots à rechercher
+    highlight_letter_grid(img);
+    highlight_search_words(img);
+
     // Convertir en BinaryImage pour la segmentation
     BinaryImage* bin = create_binary_image(img);
     if (!bin) {
@@ -48,6 +52,10 @@ int perform_segmentation(const char *path)
         return 1;
     }
     printf("Found %d characters\n", num_chars);
+
+    // Filtrer pour garder uniquement les lettres probables
+    chars = filter_letters(chars, &num_chars);
+    printf("Kept %d probable letters\n", num_chars);
 
 
     // Sauvegarder chaque caractère

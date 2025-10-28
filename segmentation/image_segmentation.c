@@ -76,3 +76,92 @@ void save_surface(const char* filename, SDL_Surface* img) {
     }
 }
 
+// Encadre la grille de lettres (zone principale du tableau) en rouge
+void highlight_letter_grid(SDL_Surface* surf) {
+    if (!surf) return;
+
+    int y_limit = (int)(surf->h * 0.9f); // exclure ~10% du bas (zone des mots à rechercher)
+    if (y_limit <= 0) y_limit = surf->h;
+
+    SDL_LockSurface(surf);
+    uint8_t* pixels = (uint8_t*)surf->pixels;
+
+    int minx = surf->w, miny = y_limit, maxx = -1, maxy = -1;
+
+    for (int y = 0; y < y_limit; y++) {
+        for (int x = 0; x < surf->w; x++) {
+            uint32_t* pixel = (uint32_t*)(pixels + y * surf->pitch + x * 4);
+            uint8_t r = (*pixel & surf->format->Rmask) >> surf->format->Rshift;
+            // considérer les pixels sombres comme appartenant à la grille
+            if (r < 128) {
+                if (x < minx) minx = x;
+                if (x > maxx) maxx = x;
+                if (y < miny) miny = y;
+                if (y > maxy) maxy = y;
+            }
+        }
+    }
+
+    SDL_UnlockSurface(surf);
+
+    // Rien détecté
+    if (maxx < 0 || maxy < 0 || minx >= surf->w || miny >= surf->h) return;
+
+    // Ajouter une petite marge et recadrer aux bornes
+    int margin = 3;
+    int x = (minx - margin < 0) ? 0 : (minx - margin);
+    int y = (miny - margin < 0) ? 0 : (miny - margin);
+    int right = (maxx + margin >= surf->w) ? (surf->w - 1) : (maxx + margin);
+    int bottom = (maxy + margin >= y_limit) ? (y_limit - 1) : (maxy + margin);
+    int w = right - x + 1;
+    int h = bottom - y + 1;
+
+    // Dessiner le rectangle rouge
+    draw_rectangle(surf, x, y, w, h, 255, 0, 0);
+}
+
+// Encadre la liste de mots à rechercher (en bas de l'image) en rouge
+void highlight_search_words(SDL_Surface* surf) {
+    if (!surf) return;
+
+    // Supposons que les mots à rechercher sont dans les 10% inférieurs
+    int y_start = (int)(surf->h * 0.9f);
+    if (y_start >= surf->h) return;
+
+    SDL_LockSurface(surf);
+    uint8_t* pixels = (uint8_t*)surf->pixels;
+
+    int minx = surf->w, maxx = -1, miny = surf->h, maxy = -1;
+
+    // Chercher les pixels sombres dans la zone du bas
+    for (int y = y_start; y < surf->h; y++) {
+        for (int x = 0; x < surf->w; x++) {
+            uint32_t* pixel = (uint32_t*)(pixels + y * surf->pitch + x * 4);
+            uint8_t r = (*pixel & surf->format->Rmask) >> surf->format->Rshift;
+            if (r < 128) { // Pixel sombre (texte)
+                if (x < minx) minx = x;
+                if (x > maxx) maxx = x;
+                if (y < miny) miny = y;
+                if (y > maxy) maxy = y;
+            }
+        }
+    }
+
+    SDL_UnlockSurface(surf);
+
+    // Rien détecté
+    if (maxx < 0 || maxy < 0 || minx >= surf->w || miny >= surf->h) return;
+
+    // Ajouter une petite marge et recadrer aux bornes
+    int margin = 3;
+    int x = (minx - margin < 0) ? 0 : (minx - margin);
+    int y = (miny - margin < y_start) ? y_start : (miny - margin);
+    int right = (maxx + margin >= surf->w) ? (surf->w - 1) : (maxx + margin);
+    int bottom = (maxy + margin >= surf->h) ? (surf->h - 1) : (maxy + margin);
+    int w = right - x + 1;
+    int h = bottom - y + 1;
+
+    // Dessiner le rectangle rouge autour de la zone des mots à rechercher
+    draw_rectangle(surf, x, y, w, h, 255, 0, 0);
+}
+
