@@ -123,18 +123,16 @@ static void bfs_component(BinaryImage* bin, bool* visited, int start_x, int star
 Character* find_characters_in_grid(BinaryImage* bin, int* num_chars, 
                                    int offset_x, int offset_y) {
     if (!bin || !num_chars) return NULL;
-    
-    printf("  🔍 Finding connected components...\n");
-    
+
     bool* visited = calloc(bin->width * bin->height, sizeof(bool));
     if (!visited) return NULL;
-    
+
     Component* temp_comps = malloc(1000 * sizeof(Component));
     if (!temp_comps) {
         free(visited);
         return NULL;
     }
-    
+
     int comp_count = 0;
     Queue* q = create_queue(bin->width * bin->height);
     if (!q) {
@@ -142,53 +140,48 @@ Character* find_characters_in_grid(BinaryImage* bin, int* num_chars,
         free(temp_comps);
         return NULL;
     }
-    
-    // Parcourir l'image pour trouver les composantes
+
     for (int y = 0; y < bin->height; y++) {
         for (int x = 0; x < bin->width; x++) {
             int idx = y * bin->width + x;
-            
+
             if (!visited[idx] && bin->data[idx] == 0) {
                 if (comp_count >= 1000) break;
-                
+
                 Component comp;
                 bfs_component(bin, visited, x, y, &comp, q);
-                
+
                 temp_comps[comp_count++] = comp;
             }
         }
     }
-    
+
     free_queue(q);
-    
-    printf("     • Found %d components\n", comp_count);
-    
-    // Allouer les caractères
+
     Character* chars = malloc(comp_count * sizeof(Character));
     if (!chars) {
         free(visited);
         free(temp_comps);
         return NULL;
     }
-    
+
     *num_chars = comp_count;
-    
-    // Le reste du code d'extraction reste identique...
+
     for (int i = 0; i < comp_count; i++) {
         Component* comp = &temp_comps[i];
-        
+
         chars[i].x = comp->min_x + offset_x;
         chars[i].y = comp->min_y + offset_y;
         chars[i].width = comp->max_x - comp->min_x + 1;
         chars[i].height = comp->max_y - comp->min_y + 1;
         chars[i].zone = ZONE_UNKNOWN;
-        
+
         int size = chars[i].width * chars[i].height;
         chars[i].data = malloc(size);
-        
+
         if (chars[i].data) {
             memset(chars[i].data, 255, size);
-            
+
             for (int y = comp->min_y; y <= comp->max_y; y++) {
                 for (int x = comp->min_x; x <= comp->max_x; x++) {
                     if (bin->data[y * bin->width + x] == 0) {
@@ -200,7 +193,7 @@ Character* find_characters_in_grid(BinaryImage* bin, int* num_chars,
             }
         }
     }
-    
+
     free(visited);
     free(temp_comps);
     return chars;
@@ -214,8 +207,6 @@ void assign_character_zones(Character* chars, int num_chars,
                             GridBounds grid_bounds, GridBounds list_bounds) {
     if (!chars) return;
 
-    printf("  🎯 Assigning character zones...\n");
-
     int grid_count = 0;
     int list_count = 0;
 
@@ -223,13 +214,11 @@ void assign_character_zones(Character* chars, int num_chars,
         int cx = chars[i].x + chars[i].width / 2;
         int cy = chars[i].y + chars[i].height / 2;
 
-        // Vérifier si dans la grille
         bool in_grid = (cx >= grid_bounds.x && 
                        cx < grid_bounds.x + grid_bounds.width &&
                        cy >= grid_bounds.y && 
                        cy < grid_bounds.y + grid_bounds.height);
 
-        // Vérifier si dans la liste
         bool in_list = false;
         if (list_bounds.valid) {
             in_list = (cx >= list_bounds.x && 
@@ -248,10 +237,6 @@ void assign_character_zones(Character* chars, int num_chars,
             chars[i].zone = ZONE_UNKNOWN;
         }
     }
-
-    printf("     • Grid letters: %d\n", grid_count);
-    printf("     • Word list letters: %d\n", list_count);
-    printf("     • Unknown: %d\n", num_chars - grid_count - list_count);
 }
 
 
@@ -262,19 +247,14 @@ void assign_character_zones(Character* chars, int num_chars,
 Character* filter_letters(Character* chars, int* num_chars) {
     if (!chars || !num_chars || *num_chars == 0) return chars;
 
-    printf("  🔧 Filtering characters...\n");
-    printf("     • Initial: %d\n", *num_chars);
-
     int total_w = 0, total_h = 0;
     for (int i = 0; i < *num_chars; i++) {
         total_w += chars[i].width;
         total_h += chars[i].height;
     }
-    
+
     int avg_w = total_w / *num_chars;
     int avg_h = total_h / *num_chars;
-
-    printf("     • Average size: %dx%d\n", avg_w, avg_h);
 
     int kept = 0;
     for (int i = 0; i < *num_chars; i++) {
@@ -299,13 +279,12 @@ Character* filter_letters(Character* chars, int* num_chars) {
     }
 
     *num_chars = kept;
-    printf("     • After filtering: %d\n", kept);
 
     return realloc(chars, kept * sizeof(Character));
 }
 
 // ============================================================================
-// SAUVEGARDE BMP
+// SAVE BMP
 // ============================================================================
 
 void save_character_bmp(Character* ch, const char* filename, int target_size) {
@@ -314,7 +293,7 @@ void save_character_bmp(Character* ch, const char* filename, int target_size) {
     SDL_Surface* surf = SDL_CreateRGBSurfaceWithFormat(
         0, ch->width, ch->height, 32, SDL_PIXELFORMAT_RGBA32
     );
-    
+
     if (!surf) return;
 
     SDL_LockSurface(surf);
@@ -334,17 +313,17 @@ void save_character_bmp(Character* ch, const char* filename, int target_size) {
         SDL_Surface* resized = SDL_CreateRGBSurfaceWithFormat(
             0, target_size, target_size, 32, SDL_PIXELFORMAT_RGBA32
         );
-        
+
         if (resized) {
             SDL_FillRect(resized, NULL, SDL_MapRGB(resized->format, 255, 255, 255));
-            
+
             SDL_Rect dst;
             float scale = fminf((float)target_size / ch->width, (float)target_size / ch->height);
             dst.w = (int)(ch->width * scale);
             dst.h = (int)(ch->height * scale);
             dst.x = (target_size - dst.w) / 2;
             dst.y = (target_size - dst.h) / 2;
-            
+
             SDL_BlitScaled(surf, NULL, resized, &dst);
             SDL_FreeSurface(surf);
             surf = resized;

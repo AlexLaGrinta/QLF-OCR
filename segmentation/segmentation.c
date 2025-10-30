@@ -19,13 +19,6 @@ int perform_segmentation(const char *path) {
         return 1;
     }
 
-    printf("\n");
-    printf("═══════════════════════════════════════════════════════\n");
-    printf("  WORD SEARCH - INTELLIGENT SEGMENTATION v2.0\n");
-    printf("═══════════════════════════════════════════════════════\n\n");
-    
-    printf("📂 Loading: %s\n", path);
-    
     SDL_Surface* img = IMG_Load(path);
     if (!img) {
         fprintf(stderr, "Failed to load: %s\n", IMG_GetError());
@@ -34,17 +27,10 @@ int perform_segmentation(const char *path) {
         return 1;
     }
 
-    printf("   ✓ Image: %dx%d pixels\n\n", img->w, img->h);
-
     // ========================================================================
     // STEP 1: CONVERSION EN IMAGE BINAIRE
     // ========================================================================
-    
-    printf("\n");
-    printf("═══════════════════════════════════════════════════════\n");
-    printf("  STEP 1: BINARY CONVERSION\n");
-    printf("═══════════════════════════════════════════════════════\n\n");
-    
+
     BinaryImage* bin = create_binary_image_from_surface(img);
     if (!bin) {
         fprintf(stderr, "✗ Binary conversion failed\n");
@@ -53,23 +39,16 @@ int perform_segmentation(const char *path) {
         SDL_Quit();
         return 1;
     }
-    
-    printf("  ✓ Binary image created (%dx%d)\n", bin->width, bin->height);
 
     // ========================================================================
     // STEP 2: DÉTECTION DES ZONES (GRILLE + LISTE)
     // ========================================================================
-    
-    printf("\n");
-    printf("═══════════════════════════════════════════════════════\n");
-    printf("  STEP 2: ZONE DETECTION\n");
-    printf("═══════════════════════════════════════════════════════\n\n");
-    
+
     GridBounds grid_bounds = {0};
     GridBounds list_bounds = {0};
-    
+
     int zones_detected = detect_major_zones_improved(bin, &grid_bounds, &list_bounds);
-    
+
     if (!grid_bounds.valid) {
         fprintf(stderr, "✗ Grid detection failed\n");
         free_binary_image(bin);
@@ -82,15 +61,10 @@ int perform_segmentation(const char *path) {
     // ========================================================================
     // STEP 3: EXTRACTION DES CARACTÈRES
     // ========================================================================
-    
-    printf("\n");
-    printf("═══════════════════════════════════════════════════════\n");
-    printf("  STEP 3: CHARACTER EXTRACTION\n");
-    printf("═══════════════════════════════════════════════════════\n\n");
-    
+
     int num_chars = 0;
     Character* chars = find_characters_in_grid(bin, &num_chars, 0, 0);
-    
+
     if (!chars) {
         fprintf(stderr, "✗ Character extraction failed\n");
         free_binary_image(bin);
@@ -99,36 +73,24 @@ int perform_segmentation(const char *path) {
         SDL_Quit();
         return 1;
     }
-    
-    printf("  ✓ Extracted %d characters\n", num_chars);
 
     // ========================================================================
     // STEP 4: ASSIGNATION DES ZONES
     // ========================================================================
-    
-    printf("\n");
-    printf("═══════════════════════════════════════════════════════\n");
-    printf("  STEP 4: ZONE ASSIGNMENT\n");
-    printf("═══════════════════════════════════════════════════════\n\n");
-    
+
     assign_character_zones(chars, num_chars, grid_bounds, list_bounds);
 
     // ========================================================================
     // STEP 5: FILTRAGE (optionnel)
     // ========================================================================
-    
-    printf("\n");
-    printf("═══════════════════════════════════════════════════════\n");
-    printf("  STEP 5: FILTERING\n");
-    printf("═══════════════════════════════════════════════════════\n\n");
-    
-   chars = filter_letters(chars, &num_chars);
+
+    //chars = filter_letters(chars, &num_chars);
     printf("   ✓ Final: %d characters\n", num_chars);
 
     // ========================================================================
     // STEP 6: CRÉATION DES DOSSIERS DE SORTIE
     // ========================================================================
-    
+
     #ifdef _WIN32
         _mkdir("output");
         _mkdir("output\\grid_letters");
@@ -142,18 +104,13 @@ int perform_segmentation(const char *path) {
     // ========================================================================
     // STEP 7: SAUVEGARDE DES CARACTÈRES
     // ========================================================================
-    
-    printf("\n");
-    printf("═══════════════════════════════════════════════════════\n");
-    printf("  STEP 6: SAVING CHARACTERS\n");
-    printf("═══════════════════════════════════════════════════════\n\n");
-    
+
     int grid_count = 0;
     int list_count = 0;
-    
+
     for (int i = 0; i < num_chars; i++) {
         char filename[512];
-        
+
         if (chars[i].zone == ZONE_GRID) {
             snprintf(filename, sizeof(filename), "output/grid_letters/letter_%04d.bmp", grid_count);
             save_character_bmp(&chars[i], filename, 28);
@@ -164,57 +121,45 @@ int perform_segmentation(const char *path) {
             list_count++;
         }
     }
-    
-    printf("  💾 Grid letters: %d → output/grid_letters/\n", grid_count);
-    printf("  💾 Word list letters: %d → output/wordlist_letters/\n\n", list_count);
 
     // ========================================================================
     // STEP 8: VISUALISATION
     // ========================================================================
-    
-    printf("\n");
-    printf("═══════════════════════════════════════════════════════\n");
-    printf("  STEP 7: VISUALIZATION\n");
-    printf("═══════════════════════════════════════════════════════\n\n");
-    
+
     SDL_Surface* rgba_img = SDL_ConvertSurfaceFormat(img, SDL_PIXELFORMAT_RGBA32, 0);
     if (rgba_img) {
-        // Dessiner les zones détectées
+
         draw_rectangle_color(rgba_img, 
                            grid_bounds.x, grid_bounds.y, 
                            grid_bounds.width, grid_bounds.height,
-                           0, 0, 255); // Bleu pour la grille
-        
+                           0, 0, 255);
+
         if (list_bounds.valid) {
-            draw_rectangle_color(rgba_img, 
-                               list_bounds.x, list_bounds.y, 
+            draw_rectangle_color(rgba_img,
+                               list_bounds.x, list_bounds.y,
                                list_bounds.width, list_bounds.height,
-                               0, 255, 0); // Vert pour la liste
+                               0, 255, 0);
         }
-        
-        // Dessiner les caractères détectés
+
         SDL_LockSurface(rgba_img);
-        
+
         for (int i = 0; i < num_chars; i++) {
             Uint8 r = (chars[i].zone == ZONE_GRID) ? 255 : 255;
             Uint8 g = (chars[i].zone == ZONE_GRID) ? 0 : 255;
             Uint8 b = 0;
-            
-            // Dessiner le contour du caractère
+
             int x = chars[i].x;
             int y = chars[i].y;
             int w = chars[i].width;
             int h = chars[i].height;
-            
-            // Ligne haut
+
             for (int px = x; px < x + w && px < rgba_img->w; px++) {
                 if (y >= 0 && y < rgba_img->h) {
                     Uint32* pixel = (Uint32*)((Uint8*)rgba_img->pixels + y * rgba_img->pitch + px * 4);
                     *pixel = SDL_MapRGB(rgba_img->format, r, g, b);
                 }
             }
-            
-            // Ligne bas
+
             for (int px = x; px < x + w && px < rgba_img->w; px++) {
                 int py = y + h - 1;
                 if (py >= 0 && py < rgba_img->h) {
@@ -222,16 +167,14 @@ int perform_segmentation(const char *path) {
                     *pixel = SDL_MapRGB(rgba_img->format, r, g, b);
                 }
             }
-            
-            // Ligne gauche
+
             for (int py = y; py < y + h && py < rgba_img->h; py++) {
                 if (x >= 0 && x < rgba_img->w) {
                     Uint32* pixel = (Uint32*)((Uint8*)rgba_img->pixels + py * rgba_img->pitch + x * 4);
                     *pixel = SDL_MapRGB(rgba_img->format, r, g, b);
                 }
             }
-            
-            // Ligne droite
+
             for (int py = y; py < y + h && py < rgba_img->h; py++) {
                 int px_right = x + w - 1;
                 if (px_right >= 0 && px_right < rgba_img->w) {
@@ -240,35 +183,24 @@ int perform_segmentation(const char *path) {
                 }
             }
         }
-        
+
         SDL_UnlockSurface(rgba_img);
-        
+
         save_surface("output/visualization.bmp", rgba_img);
         SDL_FreeSurface(rgba_img);
-        
-        printf("     ✓ Saved: output/visualization.bmp\n");
-        printf("     • 🔵 Blue   = Grid zone\n");
-        printf("     • 🟢 Green  = Word list zone\n");
-        printf("     • 🔴 Red    = Grid letters\n");
-        printf("     • 🟡 Yellow = Word list letters\n\n");
     }
 
     // ========================================================================
     // NETTOYAGE
     // ========================================================================
-    
+
     free_characters(chars, num_chars);
     free_binary_image(bin);
     SDL_FreeSurface(img);
-    
-    printf("\n");
-    printf("═══════════════════════════════════════════════════════\n");
-    printf("  ✅ SEGMENTATION COMPLETE\n");
-    printf("═══════════════════════════════════════════════════════\n\n");
 
     IMG_Quit();
     SDL_Quit();
-    
+
     return 0;
 }
 
