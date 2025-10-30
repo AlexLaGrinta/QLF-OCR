@@ -640,8 +640,6 @@ int detect_major_zones_improved(BinaryImage* bin, GridBounds* grid_bounds, GridB
 
     int grid_count = 0;
     if (best_cluster >= 0) {
-        printf("\n  ✓ Grid identified: Cluster %d (regularity: %.2f, rows: %d)\n", 
-               best_cluster, best_regularity, best_rows);
 
         int min_x = INT_MAX, max_x = 0;
         int min_y = INT_MAX, max_y = 0;

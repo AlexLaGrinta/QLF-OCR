@@ -85,7 +85,6 @@ int perform_segmentation(const char *path) {
     // ========================================================================
 
     //chars = filter_letters(chars, &num_chars);
-    printf("   ✓ Final: %d characters\n", num_chars);
 
     // ========================================================================
     // STEP 6: CRÉATION DES DOSSIERS DE SORTIE
