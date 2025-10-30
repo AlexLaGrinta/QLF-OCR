@@ -70,108 +70,110 @@ static bool dequeue(Queue* q, int* x, int* y) {
     return true;
 }
 
+static bool is_empty(Queue* q) {
+    return q->front >= q->rear;
+}
+
 // ============================================================================
 // BFS POUR DÉTECTION DE COMPOSANTES
 // ============================================================================
 
-static void bfs_component(BinaryImage* bin, int start_x, int start_y, 
-                         uint8_t* visited, Component* comp) {
-    Queue* q = create_queue(bin->width * bin->height);
-    if (!q) return;
-
+static void bfs_component(BinaryImage* bin, bool* visited, int start_x, int start_y, 
+                         Component* comp, Queue* q) {
+    comp->min_x = start_x;
+    comp->max_x = start_x;
+    comp->min_y = start_y;
+    comp->max_y = start_y;
+    comp->pixel_count = 0;
+    comp->valid = true;
+    
+    q->front = 0;
+    q->rear = 0;
     enqueue(q, start_x, start_y);
-    visited[start_y * bin->width + start_x] = 1;
-
-    int x, y;
-    while (dequeue(q, &x, &y)) {
+    visited[start_y * bin->width + start_x] = true;
+    
+    int dx[] = {-1, 1, 0, 0, -1, -1, 1, 1};
+    int dy[] = {0, 0, -1, 1, -1, 1, -1, 1};
+    
+    while (!is_empty(q)) {
+        int x, y;
+        dequeue(q, &x, &y);
         comp->pixel_count++;
-
+        
         if (x < comp->min_x) comp->min_x = x;
         if (x > comp->max_x) comp->max_x = x;
         if (y < comp->min_y) comp->min_y = y;
         if (y > comp->max_y) comp->max_y = y;
-
-        // Explorer les 8 voisins
-        for (int dy = -1; dy <= 1; dy++) {
-            for (int dx = -1; dx <= 1; dx++) {
-                if (dx == 0 && dy == 0) continue;
-
-                int nx = x + dx;
-                int ny = y + dy;
-
-                if (nx >= 0 && nx < bin->width && ny >= 0 && ny < bin->height) {
-                    int idx = ny * bin->width + nx;
-                    if (bin->data[idx] == 0 && !visited[idx]) {
-                        visited[idx] = 1;
-                        enqueue(q, nx, ny);
-                    }
+        
+        for (int i = 0; i < 8; i++) {
+            int nx = x + dx[i];
+            int ny = y + dy[i];
+            
+            if (nx >= 0 && nx < bin->width && ny >= 0 && ny < bin->height) {
+                int idx = ny * bin->width + nx;
+                if (!visited[idx] && bin->data[idx] == 0) {
+                    visited[idx] = true;
+                    enqueue(q, nx, ny);
                 }
             }
         }
     }
-
-    free_queue(q);
 }
 
-Character* find_characters_in_grid(BinaryImage* bin, int* num_chars, int offset_x, int offset_y) {
-    if (!bin || !bin->data || !num_chars) return NULL;
-
-    *num_chars = 0;
-    uint8_t* visited = calloc(bin->width * bin->height, sizeof(uint8_t));
+Character* find_characters_in_grid(BinaryImage* bin, int* num_chars, 
+                                   int offset_x, int offset_y) {
+    if (!bin || !num_chars) return NULL;
+    
+    printf("  🔍 Finding connected components...\n");
+    
+    bool* visited = calloc(bin->width * bin->height, sizeof(bool));
     if (!visited) return NULL;
-
+    
     Component* temp_comps = malloc(1000 * sizeof(Component));
     if (!temp_comps) {
         free(visited);
         return NULL;
     }
-
+    
     int comp_count = 0;
-
-    printf("  🔍 Scanning for connected components...\n");
-
-    // Parcourir l'image
-    for (int y = 0; y < bin->height; y++) {
-        for (int x = 0; x < bin->width; x++) {
-            if (bin->data[y * bin->width + x] == 0 && !visited[y * bin->width + x]) {
-                Component comp = {
-                    .min_x = x, .max_x = x,
-                    .min_y = y, .max_y = y,
-                    .pixel_count = 0,
-                    .valid = false
-                };
-
-                bfs_component(bin, x, y, visited, &comp);
-
-                int width = comp.max_x - comp.min_x + 1;
-                int height = comp.max_y - comp.min_y + 1;
-
-                comp.valid = true;
-                temp_comps[comp_count++] = comp;
-                if (comp_count >= 1000) goto extraction_done;
-            }
-        }
-    }
-
-extraction_done:
-    printf("     • Found %d components\n", comp_count);
-
-    if (comp_count == 0) {
+    Queue* q = create_queue(bin->width * bin->height);
+    if (!q) {
         free(visited);
         free(temp_comps);
         return NULL;
     }
-
-    // Créer les caractères
+    
+    // Parcourir l'image pour trouver les composantes
+    for (int y = 0; y < bin->height; y++) {
+        for (int x = 0; x < bin->width; x++) {
+            int idx = y * bin->width + x;
+            
+            if (!visited[idx] && bin->data[idx] == 0) {
+                if (comp_count >= 1000) break;
+                
+                Component comp;
+                bfs_component(bin, visited, x, y, &comp, q);
+                
+                temp_comps[comp_count++] = comp;
+            }
+        }
+    }
+    
+    free_queue(q);
+    
+    printf("     • Found %d components\n", comp_count);
+    
+    // Allouer les caractères
     Character* chars = malloc(comp_count * sizeof(Character));
     if (!chars) {
         free(visited);
         free(temp_comps);
         return NULL;
     }
-
+    
     *num_chars = comp_count;
-
+    
+    // Le reste du code d'extraction reste identique...
     for (int i = 0; i < comp_count; i++) {
         Component* comp = &temp_comps[i];
         
@@ -198,7 +200,7 @@ extraction_done:
             }
         }
     }
-
+    
     free(visited);
     free(temp_comps);
     return chars;
