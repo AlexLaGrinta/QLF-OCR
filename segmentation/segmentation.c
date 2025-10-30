@@ -122,7 +122,7 @@ int perform_segmentation(const char *path) {
     printf("  STEP 5: FILTERING\n");
     printf("═══════════════════════════════════════════════════════\n\n");
     
-   // chars = filter_letters(chars, &num_chars);
+   chars = filter_letters(chars, &num_chars);
     printf("   ✓ Final: %d characters\n", num_chars);
 
     // ========================================================================
