@@ -1,11 +1,14 @@
-#ifndef IMAGE_PROCESSING_H
-#define IMAGE_PROCESSING_H
+#ifndef IMAGE_SEGMENTATION_H
+#define IMAGE_SEGMENTATION_H
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <SDL2/SDL.h>
 
-// Définition des structures
+// ============================================================================
+// STRUCTURES
+// ============================================================================
+
 typedef struct {
     uint8_t* data;
     int width;
@@ -13,26 +16,59 @@ typedef struct {
 } BinaryImage;
 
 typedef struct {
-    uint8_t* data;
-    int width;
-    int height;
-    int x;
-    int y;
-} Character;
+    int x, y;
+    int width, height;
+    bool valid;
+} GridBounds;
 
-// Fonctions pour la segmentation
-BinaryImage* create_binary_image(SDL_Surface* surface);
-void free_binary_image(BinaryImage* bin);
+typedef struct {
+    int rows;
+    int cols;
+    float cell_width;
+    float cell_height;
+    GridBounds box;
+} GridZone;
 
-// Fonctions pour le dessin (compatibles avec SDL_Surface)
-void draw_rectangle(SDL_Surface* surf, int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b);
-void save_surface(const char* filename, SDL_Surface* img);
+typedef struct {
+    char** words;
+    int count;
+    GridBounds box;
+} WordList;
 
-// Encadre la grille de lettres (rectangle rouge autour de la zone principale)
-void highlight_letter_grid(SDL_Surface* surf);
+// ============================================================================
+// FONCTIONS D'IMAGE BINAIRE
+// ============================================================================
 
-// Encadre la liste de mots à rechercher (rectangle rouge en bas de l'image)
-void highlight_search_words(SDL_Surface* surf);
+BinaryImage* create_binary_image_from_surface(SDL_Surface* surface);
+void free_binary_image(BinaryImage* img);
 
-#endif // IMAGE_PROCESSING_H
+// ============================================================================
+// DÉTECTION INTELLIGENTE DE ZONES
+// ============================================================================
+
+/**
+ * Détecte automatiquement la grille (recherche de structure régulière)
+ */
+GridBounds detect_grid_smart(BinaryImage* bin);
+
+/**
+ * Détecte la liste de mots (tout ce qui n'est pas la grille)
+ */
+GridBounds detect_wordlist_smart(BinaryImage* bin, GridBounds grid);
+
+/**
+ * Détection améliorée avec DBSCAN + analyse de densité
+ */
+int detect_major_zones_improved(BinaryImage* bin, GridBounds* grid_bounds, GridBounds* list_bounds);
+
+// ============================================================================
+// UTILITAIRES
+// ============================================================================
+
+void draw_rectangle_color(SDL_Surface* surface, int x, int y, int w, int h, Uint8 r, Uint8 g, Uint8 b);
+void save_surface(const char* filename, SDL_Surface* surface);
+void free_grid_zone(GridZone* grid);
+void free_word_list(WordList* list);
+
+#endif // IMAGE_SEGMENTATION_H
 

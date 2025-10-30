@@ -1,25 +1,30 @@
-#Makefile
-CC      := gcc
-TARGET  := main
-SRC     := main.c segmentation.c char_segmentation.c image_segmentation.c
-OBJ     := $(SRC:.c=.o)
+# Makefile pour le projet de segmentation de caractères
 
-CFLAGS  := -std=c11 -Wall -Wextra -O2 $(shell pkg-config --cflags sdl2 SDL2_image)
-LDLIBS := -lSDL2 -lSDL2_image -lm
+CC = gcc
+CFLAGS = -Wall -Wextra -O2 -g `sdl2-config --cflags`
+LDFLAGS = `sdl2-config --libs` -lSDL2_image -lm
 
-.PHONY: all clean
-all: $(TARGET)
+# Fichiers sources et objets
+SOURCES = segmentation.c image_segmentation.c char_segmentation.c
+OBJECTS = $(SOURCES:.c=.o)
+EXECUTABLE = segmentation
 
-.INTERMEDIATE: $(OBJ)
+# Règle par défaut
+all: $(EXECUTABLE)
 
-$(TARGET): $(OBJ)
-	$(CC) $(OBJ) -o $@ $(LDLIBS)
+# Compilation de l'exécutable
+$(EXECUTABLE): $(OBJECTS)
+	$(CC) $(OBJECTS) -o $@ $(LDFLAGS)
+	@echo "Build complete: $(EXECUTABLE)"
 
+# Compilation des fichiers objets
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# Nettoyage
 clean:
-	rm -f $(OBJ) $(TARGET)
-	rm -rf chars
-	rm output_with_rectangles.bmp
+	rm -f $(OBJECTS) $(EXECUTABLE)
+	rm -rf output
+	@echo "Clean complete"
+
 
