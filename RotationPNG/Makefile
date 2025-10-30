@@ -1,23 +1,14 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -O2
-LIBS = -lpng -lm
+CFLAGS = -O2 -Wall -Wextra `pkg-config --cflags gdk-pixbuf-2.0`
+LIBS = `pkg-config --libs gdk-pixbuf-2.0` -lm
 TARGET = rotate_png
 SRC = rotate_png.c
-OBJ = $(SRC:.c=.o)
 
 all: $(TARGET)
-
-$(TARGET): $(OBJ)
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJ) $(LIBS)
-
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
+$(TARGET): $(SRC)
+	$(CC) $(CFLAGS) -o $(TARGET) $(SRC) $(LIBS)
 clean:
-	rm -f $(OBJ) $(TARGET)
-
-re: clean all
-
-run: $(TARGET)
-	./$(TARGET) input.png 45
+	rm -f $(TARGET)
+run:
+	./$(TARGET) input.png 45 output.bmp
 
