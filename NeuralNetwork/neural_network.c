@@ -392,29 +392,31 @@ void test_score_dataset(NeuralNetwork* network, const char* path)
 
 
 
-
+/*
 int main()
 {
 
     NeuralNetwork network;
 
     
-    load_network_weights(&network, "../temp/heybro.bin");
+    load_network_weights(&network, "../temp/eliotsoumeillan.bin");
 
-
-    double* inputs = img_to_binary_matrix("000015.png");
+    
+    double* inputs = img_to_binary_matrix("000022.png");
 
     int res = predict(&network, inputs);
 
     printf("%c\n", res+'A');
 
     free(inputs);
+    
+
 
     //test_score_dataset(&network, "../dataset/dataset_uppercase");
     
-    //start_training_with_dataset(&network, "../dataset/training_data");
+    start_training_with_dataset(&network, "../dataset/dataset_uppercase");
 
-    //save_network_weights(&network, "zgeg");
+    //save_network_weights(&network, "eliotsoumeillan2");
     
 
 
@@ -423,3 +425,4 @@ int main()
     
     return EXIT_SUCCESS;
 }
+*/

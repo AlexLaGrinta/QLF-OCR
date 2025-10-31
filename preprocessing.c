@@ -58,7 +58,7 @@ int preprocess_image(const char* path)
     grayscale_inplace(img);
 
     // 2) Filtre médian pour débruitage
-    median_filter(img);
+    //median_filter(img);
 
     // 3) Seuil d'Otsu
     uint8_t th = otsu_threshold(img);

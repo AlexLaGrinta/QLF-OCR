@@ -10,8 +10,8 @@
 
 
 typedef struct {
-    double*** matrices;            // [26][N][double*] - matrices 28x28 en double*
-    int* samples_per_letter;       // Nombre d'échantillons par lettre (A=0, B=1,...)
+    double*** matrices;            
+    int* samples_per_letter;     
 } DoubleDataset;
 
 
