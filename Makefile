@@ -1,7 +1,7 @@
 #Makefile
 CC      := gcc
 TARGET  := ocr
-SRC     := main.c preprocessing.c
+SRC     := main.c Preprocessing/preprocessing.c
 OBJ     := $(SRC:.c=.o)
 
 CFLAGS  := -std=c11 -Wall -Wextra -O2 $(shell pkg-config --cflags sdl2 SDL2_image)
