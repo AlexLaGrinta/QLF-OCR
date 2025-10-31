@@ -28,7 +28,7 @@ int perform_segmentation(const char *path) {
     }
 
     // ========================================================================
-    // STEP 1: CONVERSION EN IMAGE BINAIRE
+    // STEP 1: CONVERSION TO BINARY IMAGE
     // ========================================================================
 
     BinaryImage* bin = create_binary_image_from_surface(img);
@@ -41,7 +41,7 @@ int perform_segmentation(const char *path) {
     }
 
     // ========================================================================
-    // STEP 2: DÉTECTION DES ZONES (GRILLE + LISTE)
+    // STEP 2: DÉTECTING ZONES (GRID + LIST)
     // ========================================================================
 
     GridBounds grid_bounds = {0};
@@ -59,7 +59,7 @@ int perform_segmentation(const char *path) {
     }
 
     // ========================================================================
-    // STEP 3: EXTRACTION DES CARACTÈRES
+    // STEP 3: CHARACTERS EXTRACTION
     // ========================================================================
 
     int num_chars = 0;
@@ -75,19 +75,19 @@ int perform_segmentation(const char *path) {
     }
 
     // ========================================================================
-    // STEP 4: ASSIGNATION DES ZONES
+    // STEP 4: ASSIGNMENT OF ZONES
     // ========================================================================
 
     assign_character_zones(chars, num_chars, grid_bounds, list_bounds);
 
     // ========================================================================
-    // STEP 5: FILTRAGE (optionnel)
+    // STEP 5: FILTERING (optionnel)
     // ========================================================================
 
-    //chars = filter_letters(chars, &num_chars);
+    chars = filter_letters(chars, &num_chars);
 
     // ========================================================================
-    // STEP 6: CRÉATION DES DOSSIERS DE SORTIE
+    // STEP 6: CREATION OF THE OUPUT FILES
     // ========================================================================
 
     #ifdef _WIN32
@@ -101,7 +101,7 @@ int perform_segmentation(const char *path) {
     #endif
 
     // ========================================================================
-    // STEP 7: SAUVEGARDE DES CARACTÈRES
+    // STEP 7: SAFEGUARDING OF THE CHARACTERS
     // ========================================================================
 
     int grid_count = 0;
@@ -122,7 +122,7 @@ int perform_segmentation(const char *path) {
     }
 
     // ========================================================================
-    // STEP 8: VISUALISATION
+    // STEP 8: VISUALIZATION
     // ========================================================================
 
     SDL_Surface* rgba_img = SDL_ConvertSurfaceFormat(img, SDL_PIXELFORMAT_RGBA32, 0);
@@ -190,7 +190,7 @@ int perform_segmentation(const char *path) {
     }
 
     // ========================================================================
-    // NETTOYAGE
+    // CLEANING 
     // ========================================================================
 
     free_characters(chars, num_chars);

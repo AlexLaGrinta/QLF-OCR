@@ -42,7 +42,7 @@ typedef struct {
 } ColumnInfo;
 
 // ============================================================================
-// CRÉATION D'IMAGE BINAIRE
+// CREATION OF A BINARY IMAGE
 // ============================================================================
 
 BinaryImage* create_binary_image_from_surface(SDL_Surface* surface) {
@@ -96,7 +96,7 @@ void free_binary_image(BinaryImage* bin) {
 }
 
 // ============================================================================
-// GESTION DES LISTES DE COMPOSANTS
+// MANAGEMENT OF COMPONENT LISTS
 // ============================================================================
 
 static ComponentList* create_component_list(int initial_capacity) {
@@ -130,7 +130,7 @@ static void free_component_list(ComponentList* list) {
 }
 
 // ============================================================================
-// EXTRACTION DE COMPOSANTES (BFS)
+// EXTRACTION OF COMPONENTS (BFS)
 // ============================================================================
 
 static void extract_component_bfs(BinaryImage* bin, bool* visited, int start_x, int start_y, Component* comp) {
@@ -341,7 +341,7 @@ static int dbscan_cluster(ComponentList* comps, int* indices, int count, float e
 }
 
 // ============================================================================
-// ANALYSE GRILLE
+// GRID ANALYSIS
 // ============================================================================
 
 static int compare_by_y(const void* a, const void* b) {
@@ -452,7 +452,7 @@ static float analyze_grid_structure(ComponentList* comps, int cluster_id) {
 }
 
 // ============================================================================
-// ANALYSE LISTE DE MOTS - DENSITÉ FAIBLE
+// ANALYSIS LIST OF WORDS - LOW DENSITY
 // ============================================================================
 
 static int compare_by_x(const void* a, const void* b) {
@@ -559,7 +559,7 @@ static WordListCandidate analyze_wordlist_cluster_density(ComponentList* comps, 
 }
 
 // ============================================================================
-// DÉTECTION ZONES PRINCIPALES
+// DÉTECTION MAIN ZONES
 // ============================================================================
 
 int detect_major_zones_improved(BinaryImage* bin, GridBounds* grid_bounds, GridBounds* list_bounds) {
@@ -731,7 +731,7 @@ int detect_major_zones_improved(BinaryImage* bin, GridBounds* grid_bounds, GridB
     free(remaining_indices);
 
     // ============================================================================
-    // 6. CHOISIR TOUS LES CLUSTERS AVEC DENSITÉ SIMILAIRE ★
+    // CHOOSE ALL THE CLUSTERS WITH SIMILAR DENSITY
     // ============================================================================
     if (num_wordlist_clusters > 0) {
         WordListCandidate* candidates = malloc(num_wordlist_clusters * sizeof(WordListCandidate));
@@ -856,7 +856,7 @@ GridBounds detect_wordlist_smart(BinaryImage* bin, GridBounds grid) {
 }
 
 // ============================================================================
-// UTILITAIRES
+// UTILITIES
 // ============================================================================
 
 void draw_rectangle_color(SDL_Surface* surface, int x, int y, int w, int h, 

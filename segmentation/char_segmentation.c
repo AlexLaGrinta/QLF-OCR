@@ -24,7 +24,7 @@ typedef struct {
 } Queue;
 
 // ============================================================================
-// FILE (QUEUE) POUR BFS
+// QUEUE FOR BFS
 // ============================================================================
 
 static Queue* create_queue(int capacity) {
@@ -75,7 +75,7 @@ static bool is_empty(Queue* q) {
 }
 
 // ============================================================================
-// BFS POUR DÉTECTION DE COMPOSANTES
+// BFS FOR COMPONENT DETECTION
 // ============================================================================
 
 static void bfs_component(BinaryImage* bin, bool* visited, int start_x, int start_y, 
@@ -200,7 +200,7 @@ Character* find_characters_in_grid(BinaryImage* bin, int* num_chars,
 }
 
 // ============================================================================
-// ASSIGNATION DES ZONES
+// ASSIGNMENT OF ZONES
 // ============================================================================
 
 void assign_character_zones(Character* chars, int num_chars, 
@@ -241,7 +241,7 @@ void assign_character_zones(Character* chars, int num_chars,
 
 
 // ============================================================================
-// FILTRAGE
+// FILTERING
 // ============================================================================
 
 Character* filter_letters(Character* chars, int* num_chars) {
@@ -263,9 +263,9 @@ Character* filter_letters(Character* chars, int* num_chars) {
         float aspect = (float)w / h;
 
         bool valid = (
-            w >= avg_w * 0.3 && w <= avg_w * 3.0 &&
-            h >= avg_h * 0.3 && h <= avg_h * 3.0 &&
-            aspect >= 0.2 && aspect <= 5.0
+            w >= avg_w * 0.15 && w <= avg_w * 2 &&
+            h >= avg_h * 0.15 && h <= avg_h * 2 &&
+            aspect >= 0.1 && aspect <= 3
         );
 
         if (valid) {
