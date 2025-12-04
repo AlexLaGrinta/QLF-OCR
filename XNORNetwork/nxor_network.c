@@ -179,7 +179,7 @@ int predict(NeuralNetwork* network, double* inputs)
     double max_value = *outputs;
     for (size_t i = 0; i < OUTPUT_SIZE; i++)
     {
-        //printf("%c : %f\n", (char)i +'A' ,outputs[i]);
+        printf("Neuron of %li : %f\n", i ,outputs[i]);
         if (outputs[i] > max_value)
         {
             max_index = i;
@@ -330,25 +330,25 @@ void test_nxor_network(NeuralNetwork* network)
 
     double inputs[2] = {1,0};
     int pred = predict(network, inputs);
-    printf("%i nxor %i = %i\n", (int)inputs[0], (int)inputs[1] ,pred);
+    printf("%i nxor %i = %i\n\n", (int)inputs[0], (int)inputs[1] ,pred);
     acc += (pred == 0);
 
     inputs[0] = 0;
     inputs[1] = 1;
     pred = predict(network, inputs);
-    printf("%i nxor %i = %i\n", (int)inputs[0], (int)inputs[1] ,pred);
+    printf("%i nxor %i = %i\n\n", (int)inputs[0], (int)inputs[1] ,pred);
     acc += (pred == 0);
 
     inputs[0] = 0;
     inputs[1] = 0;
     pred = predict(network, inputs);
-    printf("%i nxor %i = %i\n", (int)inputs[0], (int)inputs[1] ,pred);
+    printf("%i nxor %i = %i\n\n", (int)inputs[0], (int)inputs[1] ,pred);
     acc += (pred == 1);
 
     inputs[0] = 1;
     inputs[1] = 1;
     pred = predict(network, inputs);
-    printf("%i nxor %i = %i\n", (int)inputs[0], (int)inputs[1] ,pred);
+    printf("%i nxor %i = %i\n\n", (int)inputs[0], (int)inputs[1] ,pred);
     acc += (pred == 1);
 
     printf("Accuracy : %.2f%%", (acc/4)*100);

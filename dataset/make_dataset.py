@@ -14,13 +14,12 @@ OUTPUT_DIR = Path("dataset_uppercase")
 FONTS_DIR = Path("fonts")      # .ttf
 SEED = 42
 
-# Contrôles visuels
-MARGIN = 2                     # marge autour du glyphe
-FONT_MIN = 24                  # plus gros par défaut
+MARGIN = 2                     
+FONT_MIN = 24                  
 FONT_MAX = 27
-ANGLE_MAX = 2.0                # rotation max (très faible)
-ROTATE_PROB = 0.20             # 20% seulement ont une rotation
-INVERT = False                 # False = texte noir, fond blanc
+ANGLE_MAX = 2.0               
+ROTATE_PROB = 0.20             
+INVERT = False                 # False = black text
 # ---------------------------------------------
 
 random.seed(SEED)

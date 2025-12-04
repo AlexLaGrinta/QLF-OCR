@@ -9,6 +9,8 @@ OBJ = $(SRC:.c=.o)
 # === Règle par défaut ===
 all: $(TARGET)
 
+.INTERMEDIATE: $(OBJ)
+
 # === Compilation de l’exécutable ===
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -o $(TARGET) $(OBJ) $(LIBS)

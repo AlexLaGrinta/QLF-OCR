@@ -1,24 +1,19 @@
-#Makefile
-CC      := gcc
-TARGET  := ocr
-SRC     := main.c preprocessing.c
-OBJ     := $(SRC:.c=.o)
-
-CFLAGS  := -std=c11 -Wall -Wextra -O2 $(shell pkg-config --cflags sdl2 SDL2_image)
-LDLIBS := -lSDL2 -lSDL2_image -lm
-
 .PHONY: all clean
-all: $(TARGET)
 
-.INTERMEDIATE: $(OBJ)
-
-$(TARGET): $(OBJ)
-	$(CC) $(OBJ) -o $@ $(LDLIBS)
-
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+all:
+	$(MAKE) -C Interface
+	$(MAKE) -C Preprocessing
+	$(MAKE) -C RotationPNG
+	$(MAKE) -C segmentation
+	$(MAKE) -C solver-cli
+	$(MAKE) -C XNORNetwork
 
 clean:
-	rm -f $(OBJ) $(TARGET)
+	$(MAKE) -C Interface clean
+	$(MAKE) -C Preprocessing clean
+	$(MAKE) -C RotationPNG clean
+	$(MAKE) -C segmentation clean
+	$(MAKE) -C solver-cli clean
+	$(MAKE) -C XNORNetwork clean
 
 

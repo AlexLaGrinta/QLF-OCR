@@ -1,0 +1,69 @@
+Word Search Solver by QLF ! 
+
+Des images d'exemple sont disponibles dans le dossier temp/
+
+Build complet (à la racine):
+- make all
+Nettoyage:
+- make clean
+
+
+////////////////
+Sous programmes
+///////////////
+
+Preprocessing:
+Compilation:
+ - make
+   dans Preprocessing/
+puis ./ocr <image>
+Nettoyage:
+- make clean
+
+
+XNOR Network :
+L'exécution du binaire entrainera le réseau et le testera à la fin.
+Compilation:
+- make
+  dans XNORNetwork/
+Utilisation:
+./xor
+Nettoyage:
+- make clean
+
+Solver:
+Compilation :
+- make 
+  dans solver-cli/
+Utilisation :
+./solver <grid> <word>
+Nettoyage:
+- make clean
+
+Segmentation:
+Compilation :
+- make
+  dans segmentation/
+Utilisation :
+./segmentation <image>
+Nettoyage:
+- make clean (à chaque changement d'image)
+
+RotatePNG:
+Compilation:
+- make
+  dans RotatePNG/
+Utilisation : 
+./rotate_png <image> <degrees> <output_image>
+Nettoyage:
+- make clean
+
+Interface:
+Compilation:
+- make
+  dans Interface/
+Utilisation:
+./interface
+Nettoyage:
+- make clean
+

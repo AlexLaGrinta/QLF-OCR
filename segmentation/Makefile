@@ -9,6 +9,8 @@ SOURCES = segmentation.c image_segmentation.c char_segmentation.c
 OBJECTS = $(SOURCES:.c=.o)
 EXECUTABLE = segmentation
 
+.INTERMEDIATE: $(OBJECTS)
+
 # Règle par défaut
 all: $(EXECUTABLE)
 
