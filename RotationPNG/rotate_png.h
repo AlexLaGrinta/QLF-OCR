@@ -1,7 +1,10 @@
-#ifndef ROTATE_H
-#define ROTATE_H
+#ifndef ROTATE_PNG_H
+#define ROTATE_PNG_H
 
-int rotate(const char *input_path, double angle, const char *output_path);
+#include <gdk-pixbuf/gdk-pixbuf.h>
 
-#endif // ROTATE_H
+GdkPixbuf* rotate_pixbuf_bilinear_fixed(const GdkPixbuf *src, double angle_deg);
+double detect_skew_angle(const GdkPixbuf *src);
+
+#endif
 
