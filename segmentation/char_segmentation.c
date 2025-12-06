@@ -431,7 +431,7 @@ Character* filter_letters(Character* chars, int* num_chars) {
         float aspect = (h > 0) ? (float)w / h : 0;
 
         // ====================================================================
-        // ZONE GRID - FILTRE OPTIMISÉ (rejette le bruit, accepte I fins)
+        // ZONE GRID - FILTRE ULTRA RENFORCÉ (rejette petits, garde I fins)
         // ====================================================================
         if (chars[i].zone == ZONE_GRID) {
             // ----------------------------------------------------------------
@@ -443,7 +443,52 @@ Character* filter_letters(Character* chars, int* num_chars) {
             }
 
             // ----------------------------------------------------------------
-            // CRITÈRE 2: Rejeter les formes trop fragmentées/dispersées
+            // CRITÈRE 2: Dimensions minimales absolues ULTRA STRICTES
+            // ----------------------------------------------------------------
+            if (valid) {
+                // Rejeter si trop petit pour être une lettre
+                if (h < 5 && w < 5) {
+                    valid = false;
+                    grid_filtered_single++;
+                }
+                
+                // Rejeter si une dimension est trop petite
+                if (w < 1 || h < 3) {
+                    valid = false;
+                    grid_filtered_single++;
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // CRITÈRE 3: Surface minimale ULTRA RENFORCÉE
+            // ----------------------------------------------------------------
+            if (valid && area < 8) {
+                valid = false;
+                grid_filtered_single++;
+            }
+
+            // ----------------------------------------------------------------
+            // CRITÈRE 4: Hauteur minimale ULTRA STRICTE
+            // ----------------------------------------------------------------
+            if (valid && h < 6) {
+                // Exception uniquement pour les caractères TRÈS larges (-, =, _)
+                if (w < 10) {
+                    valid = false;
+                    grid_filtered_single++;
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // CRITÈRE 5: Largeur minimale pour caractères normaux RENFORCÉ
+            // ----------------------------------------------------------------
+            if (valid && h >= 6 && w < 2 && area < 10) {
+                // Trop fin pour être une lettre normale (sauf I/l, voir exceptions)
+                valid = false;
+                grid_filtered_single++;
+            }
+
+            // ----------------------------------------------------------------
+            // CRITÈRE 6: Rejeter les formes trop fragmentées ULTRA STRICT
             // ----------------------------------------------------------------
             if (valid && chars[i].data) {
                 int num_comp = count_connected_components(&chars[i]);
@@ -452,8 +497,20 @@ Character* filter_letters(Character* chars, int* num_chars) {
                 if (num_comp > 0 && area > 0) {
                     float comp_density = (float)num_comp / area;
                     
-                    // Rejeter si plus de 1 composante pour 3 pixels (très fragmenté)
-                    if (comp_density > 0.33 || num_comp > 30) {
+                    // Rejeter si plus de 1 composante pour 5 pixels (ULTRA STRICT)
+                    if (comp_density > 0.20 || num_comp > 20) {
+                        valid = false;
+                        grid_filtered_invalid++;
+                    }
+                    
+                    // Pour petites surfaces, ULTRA strict
+                    if (area < 25 && num_comp > 2) {
+                        valid = false;
+                        grid_filtered_invalid++;
+                    }
+                    
+                    // Pour surfaces moyennes, strict aussi
+                    if (area >= 25 && area < 50 && num_comp > 4) {
                         valid = false;
                         grid_filtered_invalid++;
                     }
@@ -461,7 +518,7 @@ Character* filter_letters(Character* chars, int* num_chars) {
             }
 
             // ----------------------------------------------------------------
-            // CRITÈRE 3: Rejeter les formes trop dispersées (bbox >> surface)
+            // CRITÈRE 7: Rejeter les formes trop dispersées ULTRA RENFORCÉ
             // ----------------------------------------------------------------
             if (valid) {
                 int bbox_area = w * h;
@@ -469,9 +526,26 @@ Character* filter_letters(Character* chars, int* num_chars) {
                 if (bbox_area > 0 && area > 0) {
                     float fill_ratio = (float)area / bbox_area;
                     
-                    // Rejeter si la forme occupe moins de 1% de sa bbox
-                    // (typique du bruit dispersé dans vos images)
-                    if (fill_ratio < 0.01 && area > 10) {
+                    // Rejeter si la forme occupe moins de 3% de sa bbox
+                    if (fill_ratio < 0.03 && area > 10) {
+                        valid = false;
+                        grid_filtered_invalid++;
+                    }
+                    
+                    // Rejeter si trop dispersé pour petites surfaces (RENFORCÉ)
+                    if (fill_ratio < 0.10 && area < 30) {
+                        valid = false;
+                        grid_filtered_invalid++;
+                    }
+                    
+                    // Rejeter si très dispersé pour surfaces moyennes
+                    if (fill_ratio < 0.08 && area < 60) {
+                        valid = false;
+                        grid_filtered_invalid++;
+                    }
+                    
+                    // Rejeter si dispersé pour surfaces plus grandes
+                    if (fill_ratio < 0.06 && area < 100) {
                         valid = false;
                         grid_filtered_invalid++;
                     }
@@ -479,45 +553,78 @@ Character* filter_letters(Character* chars, int* num_chars) {
             }
 
             // ----------------------------------------------------------------
-            // CRITÈRE 4: Rejeter densité extrêmement faible
+            // CRITÈRE 8: Rejeter densité faible ULTRA RENFORCÉ
             // ----------------------------------------------------------------
             if (valid && chars[i].data) {
                 float density = calculate_density(&chars[i]);
                 
-                // Rejeter si moins de 0.5% de pixels noirs
-                if (density < 0.005) {
+                // Rejeter si moins de 3% de pixels noirs
+                if (density < 0.03) {
+                    valid = false;
+                    grid_filtered_invalid++;
+                }
+                
+                // Pour petites surfaces, exiger densité TRÈS élevée
+                if (area < 25 && density < 0.25) {
+                    valid = false;
+                    grid_filtered_invalid++;
+                }
+                
+                // Pour surfaces petites-moyennes, densité élevée
+                if (area >= 25 && area < 40 && density < 0.18) {
+                    valid = false;
+                    grid_filtered_invalid++;
+                }
+                
+                // Pour surfaces moyennes, densité minimale renforcée
+                if (area >= 40 && area < 80 && density < 0.15) {
                     valid = false;
                     grid_filtered_invalid++;
                 }
             }
 
             // ----------------------------------------------------------------
-            // CRITÈRE 5: Rejeter les formes trop larges et plates
+            // CRITÈRE 9: Rejeter les formes trop larges et plates RENFORCÉ
             // ----------------------------------------------------------------
             if (valid && w > 0 && h > 0) {
                 float aspect = (float)w / h;
                 
-                // Rejeter si largeur >> hauteur ET trop fragmenté
-                if (aspect > 10.0 && h < 5) {
+                // Rejeter si largeur >> hauteur ET trop fragmenté (RENFORCÉ)
+                if (aspect > 6.0 && h < 7) {
                     if (chars[i].data) {
                         int num_comp = count_connected_components(&chars[i]);
-                        if (num_comp > 5) {
+                        if (num_comp > 2) {
                             valid = false;
                             grid_filtered_invalid++;
                         }
+                    } else {
+                        valid = false;
+                        grid_filtered_invalid++;
                     }
+                }
+                
+                // Rejeter si trop écrasé verticalement (RENFORCÉ)
+                if (aspect > 10.0 && h < 5) {
+                    valid = false;
+                    grid_filtered_invalid++;
+                }
+                
+                // Rejeter si extrêmement écrasé
+                if (aspect > 15.0 && h < 6) {
+                    valid = false;
+                    grid_filtered_invalid++;
                 }
             }
 
             // ----------------------------------------------------------------
-            // CRITÈRE 6: Rejeter les très grandes surfaces vides
+            // CRITÈRE 10: Rejeter les très grandes surfaces vides
             // ----------------------------------------------------------------
-            if (valid && area > 50000) {
+            if (valid && area > 35000) {
                 if (chars[i].data) {
                     float density = calculate_density(&chars[i]);
                     
                     // Grande surface mais très peu de contenu = bruit
-                    if (density < 0.02) {
+                    if (density < 0.04) {
                         valid = false;
                         grid_filtered_gigantic++;
                     }
@@ -528,93 +635,178 @@ Character* filter_letters(Character* chars, int* num_chars) {
             }
 
             // ----------------------------------------------------------------
-            // CRITÈRE 7: Rejeter dimensions extrêmes
+            // CRITÈRE 11: Rejeter dimensions extrêmes
             // ----------------------------------------------------------------
-            if (valid && (w > 1500 || h > 1500)) {
+            if (valid && (w > 1000 || h > 1000)) {
                 valid = false;
                 grid_filtered_gigantic++;
             }
 
             // ----------------------------------------------------------------
-            // CRITÈRE 8: Rejeter surface minimale (pixel unique)
+            // CRITÈRE 12: Rejeter caractères trop petits ULTRA STRICT
             // ----------------------------------------------------------------
-            if (valid && area < 2) {
+            if (valid && w < 6 && h < 8) {
+                // Trop petit pour être une vraie lettre (sauf exceptions)
                 valid = false;
                 grid_filtered_single++;
             }
 
-            // ================================================================
-            // EXCEPTIONS - ACCEPTER LES VRAIS CARACTÈRES
-            // ================================================================
-
             // ----------------------------------------------------------------
-            // EXCEPTION 1: I très fin (1 pixel de large, hauteur >= 4)
+            // CRITÈRE 13: Rejeter surfaces intermédiaires faibles RENFORCÉ
             // ----------------------------------------------------------------
-            if (!valid && w == 1 && h >= 4 && area >= 4) {
-                if (chars[i].data) {
-                    float density = calculate_density(&chars[i]);
-                    int num_comp = count_connected_components(&chars[i]);
-                    
-                    // Accepter si densité raisonnable et peu de composantes
-                    if (density >= 0.15 && num_comp <= 3) {
-                        valid = true;
-                        if (grid_filtered_invalid > 0) grid_filtered_invalid--;
-                        else if (grid_filtered_single > 0) grid_filtered_single--;
-                    }
-                }
+            if (valid && area >= 8 && area < 20 && h < 7) {
+                // Entre 8 et 20 pixels, exiger hauteur >= 7
+                valid = false;
+                grid_filtered_single++;
             }
 
             // ----------------------------------------------------------------
-            // EXCEPTION 2: I fin normal (2-3 pixels large, hauteur >= 5)
+            // CRITÈRE 14: Rejeter formes carrées trop petites RENFORCÉ
             // ----------------------------------------------------------------
-            if (!valid && w >= 2 && w <= 3 && h >= 5 && area >= 8) {
-                if (chars[i].data) {
-                    float density = calculate_density(&chars[i]);
-                    int num_comp = count_connected_components(&chars[i]);
-                    
-                    // Accepter si bon ratio et peu fragmenté
-                    if (density >= 0.20 && num_comp <= 4) {
-                        valid = true;
-                        if (grid_filtered_invalid > 0) grid_filtered_invalid--;
-                        else if (grid_filtered_single > 0) grid_filtered_single--;
-                    }
-                }
-            }
-
-            // ----------------------------------------------------------------
-            // EXCEPTION 3: Caractères verticaux allongés (ratio > 2.5)
-            // ----------------------------------------------------------------
-            if (!valid && w > 0 && h > 0 && h >= 6) {
-                float aspect = (float)h / w;
+            if (valid && w > 0 && h > 0) {
+                float aspect = (w > h) ? (float)w/h : (float)h/w;
                 
-                if (aspect > 2.5 && aspect < 50) {
-                    if (chars[i].data) {
-                        float density = calculate_density(&chars[i]);
-                        int num_comp = count_connected_components(&chars[i]);
-                        int bbox_area = w * h;
-                        float fill_ratio = (float)area / bbox_area;
-                        
-                        // Accepter si forme compacte et peu fragmentée
-                        if (density >= 0.15 && num_comp <= 5 && fill_ratio >= 0.15) {
-                            valid = true;
-                            if (grid_filtered_invalid > 0) grid_filtered_invalid--;
-                        }
-                    }
+                // Si presque carré et petit = probablement bruit (RENFORCÉ)
+                if (aspect < 1.5 && area < 35) {
+                    valid = false;
+                    grid_filtered_single++;
+                }
+                
+                // Si très carré et moyen-petit = aussi bruit
+                if (aspect < 1.3 && area < 50) {
+                    valid = false;
+                    grid_filtered_single++;
                 }
             }
 
             // ----------------------------------------------------------------
-            // EXCEPTION 4: Caractères compacts de taille normale
+            // CRITÈRE 15: Rejeter hauteur insuffisante pour surface moyenne
             // ----------------------------------------------------------------
-            if (!valid && w >= 4 && w <= 50 && h >= 6 && h <= 50) {
+            if (valid && area >= 20 && area < 100 && h < 6) {
+                // Surface moyenne mais hauteur insuffisante = forme plate/bruit
+                valid = false;
+                grid_filtered_single++;
+            }
+
+            // ----------------------------------------------------------------
+            // CRITÈRE 16: Rejeter formes avec bbox trop grand vs contenu
+            // ----------------------------------------------------------------
+            if (valid && chars[i].data) {
+                int bbox_area = w * h;
+                
+                if (bbox_area > 100 && area < 20) {
+                    // Bbox grande mais peu de contenu = très dispersé
+                    valid = false;
+                    grid_filtered_invalid++;
+                }
+                
+                if (bbox_area > 50 && area < 10) {
+                    valid = false;
+                    grid_filtered_invalid++;
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // CRITÈRE 17: Rejeter les formes trop fines ET courtes
+            // ----------------------------------------------------------------
+            if (valid && w <= 3 && h < 7) {
+                // Trop fin et trop court = bruit (sauf I très fins, voir exceptions)
+                valid = false;
+                grid_filtered_single++;
+            }
+
+            // ----------------------------------------------------------------
+            // CRITÈRE 18: Rejeter petites surfaces peu denses
+            // ----------------------------------------------------------------
+            if (valid && area < 30 && chars[i].data) {
+                float density = calculate_density(&chars[i]);
+                int bbox_area = w * h;
+                float fill_ratio = (float)area / bbox_area;
+                
+                // Petite surface doit être TRÈS dense et compacte
+                if (density < 0.30 || fill_ratio < 0.20) {
+                    valid = false;
+                    grid_filtered_invalid++;
+                }
+            }
+
+            // ================================================================
+            // EXCEPTIONS - ACCEPTER LES VRAIS CARACTÈRES (critères ULTRA STRICTS)
+            // ================================================================
+
+            // ----------------------------------------------------------------
+            // EXCEPTION 1: I très fin (1-2 pixels large, hauteur >= 8)
+            // ----------------------------------------------------------------
+            if (!valid && w >= 1 && w <= 2 && h >= 8 && area >= 8) {
                 if (chars[i].data) {
                     float density = calculate_density(&chars[i]);
                     int num_comp = count_connected_components(&chars[i]);
                     int bbox_area = w * h;
                     float fill_ratio = (float)area / bbox_area;
                     
-                    // Accepter si compactopact et peu fragmenté
-                    if (density >= 0.10 && num_comp <= 10 && fill_ratio >= 0.10) {
+                    // Accepter si ULTRA dense, UNE composante et TRÈS compact
+                    if (density >= 0.35 && num_comp <= 1 && fill_ratio >= 0.65) {
+                        valid = true;
+                        if (grid_filtered_invalid > 0) grid_filtered_invalid--;
+                        else if (grid_filtered_single > 0) grid_filtered_single--;
+                    }
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // EXCEPTION 2: I/l normal (2-4 pixels large, hauteur >= 9)
+            // ----------------------------------------------------------------
+            if (!valid && w >= 2 && w <= 4 && h >= 9 && area >= 14) {
+                if (chars[i].data) {
+                    float density = calculate_density(&chars[i]);
+                    int num_comp = count_connected_components(&chars[i]);
+                    int bbox_area = w * h;
+                    float fill_ratio = (float)area / bbox_area;
+                    
+                    // Accepter si très bon ratio et peu fragmenté
+                    if (density >= 0.35 && num_comp <= 2 && fill_ratio >= 0.50) {
+                        valid = true;
+                        if (grid_filtered_invalid > 0) grid_filtered_invalid--;
+                        else if (grid_filtered_single > 0) grid_filtered_single--;
+                    }
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // EXCEPTION 3: Caractères verticaux allongés (ratio > 3, h >= 10)
+            // ----------------------------------------------------------------
+            if (!valid && w > 0 && h >= 10 && w <= 12) {
+                float aspect = (float)h / w;
+                
+                if (aspect > 3.5 && aspect < 35) {
+                    if (chars[i].data) {
+                        float density = calculate_density(&chars[i]);
+                        int num_comp = count_connected_components(&chars[i]);
+                        int bbox_area = w * h;
+                        float fill_ratio = (float)area / bbox_area;
+                        
+                        // Accepter si forme compacte et très peu fragmentée
+                        if (density >= 0.25 && num_comp <= 3 && fill_ratio >= 0.30) {
+                            valid = true;
+                            if (grid_filtered_invalid > 0) grid_filtered_invalid--;
+                            else if (grid_filtered_single > 0) grid_filtered_single--;
+                        }
+                    }
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // EXCEPTION 4: Caractères compacts de taille normale (>= 8x8)
+            // ----------------------------------------------------------------
+            if (!valid && w >= 8 && w <= 40 && h >= 8 && h <= 40) {
+                if (chars[i].data) {
+                    float density = calculate_density(&chars[i]);
+                    int num_comp = count_connected_components(&chars[i]);
+                    int bbox_area = w * h;
+                    float fill_ratio = (float)area / bbox_area;
+                    
+                    // Accepter si compact et peu fragmenté
+                    if (density >= 0.18 && num_comp <= 7 && fill_ratio >= 0.18) {
                         valid = true;
                         if (grid_filtered_invalid > 0) grid_filtered_invalid--;
                         else if (grid_filtered_gigantic > 0) grid_filtered_gigantic--;
@@ -623,17 +815,17 @@ Character* filter_letters(Character* chars, int* num_chars) {
             }
 
             // ----------------------------------------------------------------
-            // EXCEPTION 5: Points, accents, petits caractères (surface 3-20)
+            // EXCEPTION 5: Points/accents TRÈS compacts (surface 8-18)
             // ----------------------------------------------------------------
-            if (!valid && area >= 3 && area <= 20) {
+            if (!valid && area >= 8 && area <= 18 && h >= 2 && h <= 6 && w >= 2 && w <= 6) {
                 if (chars[i].data) {
                     float density = calculate_density(&chars[i]);
                     int num_comp = count_connected_components(&chars[i]);
                     int bbox_area = w * h;
                     float fill_ratio = (float)area / bbox_area;
                     
-                    // Accepter si très compact (point, accent, etc.)
-                    if (density >= 0.25 && num_comp <= 2 && fill_ratio >= 0.20) {
+                    // Accepter si ULTRA compact (point, accent, etc.)
+                    if (density >= 0.50 && num_comp <= 1 && fill_ratio >= 0.45) {
                         valid = true;
                         if (grid_filtered_single > 0) grid_filtered_single--;
                         else if (grid_filtered_invalid > 0) grid_filtered_invalid--;
@@ -642,9 +834,9 @@ Character* filter_letters(Character* chars, int* num_chars) {
             }
 
             // ----------------------------------------------------------------
-            // EXCEPTION 6: Caractères moyens bien formés (surface 20-5000)
+            // EXCEPTION 6: Caractères moyens bien formés (surface 40-3500)
             // ----------------------------------------------------------------
-            if (!valid && area >= 20 && area <= 5000) {
+            if (!valid && area >= 40 && area <= 3500 && h >= 8) {
                 if (chars[i].data) {
                     float density = calculate_density(&chars[i]);
                     int num_comp = count_connected_components(&chars[i]);
@@ -652,15 +844,77 @@ Character* filter_letters(Character* chars, int* num_chars) {
                     float fill_ratio = (float)area / bbox_area;
                     
                     // Accepter si bien formé
-                    if (density >= 0.08 && num_comp <= 15 && fill_ratio >= 0.08) {
+                    if (density >= 0.15 && num_comp <= 10 && fill_ratio >= 0.15) {
                         valid = true;
                         if (grid_filtered_invalid > 0) grid_filtered_invalid--;
+                        else if (grid_filtered_single > 0) grid_filtered_single--;
+                    }
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // EXCEPTION 7: Traits horizontaux (-, =, _) TRÈS larges mais bas
+            // ----------------------------------------------------------------
+            if (!valid && w >= 10 && h >= 3 && h <= 5 && area >= 18) {
+                float aspect = (float)w / h;
+                
+                if (aspect > 3.0 && aspect < 10.0) {
+                    if (chars[i].data) {
+                        float density = calculate_density(&chars[i]);
+                        int num_comp = count_connected_components(&chars[i]);
+                        int bbox_area = w * h;
+                        float fill_ratio = (float)area / bbox_area;
+                        
+                        // Accepter si très compact horizontalement
+                        if (density >= 0.35 && num_comp <= 2 && fill_ratio >= 0.40) {
+                            valid = true;
+                            if (grid_filtered_single > 0) grid_filtered_single--;
+                        }
+                    }
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // EXCEPTION 8: Caractères moyens-larges (6-15 pixels, h >= 8)
+            // ----------------------------------------------------------------
+            if (!valid && w >= 6 && w <= 15 && h >= 8 && h <= 35) {
+                if (chars[i].data) {
+                    float density = calculate_density(&chars[i]);
+                    int num_comp = count_connected_components(&chars[i]);
+                    int bbox_area = w * h;
+                    float fill_ratio = (float)area / bbox_area;
+                    
+                    // Accepter si forme cohérente
+                    if (density >= 0.20 && num_comp <= 5 && fill_ratio >= 0.20) {
+                        valid = true;
+                        if (grid_filtered_invalid > 0) grid_filtered_invalid--;
+                        else if (grid_filtered_single > 0) grid_filtered_single--;
+                    }
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // EXCEPTION 9: Caractères larges normaux (15-40 pixels, h >= 8)
+            // ----------------------------------------------------------------
+            if (!valid && w >= 15 && w <= 40 && h >= 8 && h <= 40) {
+                if (chars[i].data) {
+                    float density = calculate_density(&chars[i]);
+                    int num_comp = count_connected_components(&chars[i]);
+                    int bbox_area = w * h;
+                    float fill_ratio = (float)area / bbox_area;
+                    
+                    // Accepter si forme valide
+                    if (density >= 0.15 && num_comp <= 8 && fill_ratio >= 0.15) {
+                        valid = true;
+                        if (grid_filtered_invalid > 0) grid_filtered_invalid--;
+                        else if (grid_filtered_single > 0) grid_filtered_single--;
                     }
                 }
             }
 
             if (valid) grid_kept++;
         }
+
 
 
         
