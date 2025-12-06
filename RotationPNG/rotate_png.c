@@ -94,6 +94,37 @@ double detect_skew_angle(const GdkPixbuf *src) {
     return best_angle;
 }
 
+
+int automatic_rotate(const char* input_path, const char* output_path)
+{
+    GError *err = NULL;
+    GdkPixbuf *src = gdk_pixbuf_new_from_file(input_path, &err);
+    if (!src) {
+        fprintf(stderr, "%s\n", err->message);
+        g_error_free(err);
+        return 1;
+    }
+
+    double angle;
+    angle = detect_skew_angle(src);
+
+    GdkPixbuf *rotated = rotate_pixbuf_bilinear_fixed(src, angle);
+    if (!gdk_pixbuf_save(rotated, output_path, "bmp", &err, NULL)) {
+        fprintf(stderr, "%s\n", err->message);
+        g_error_free(err);
+        g_object_unref(src);
+        g_object_unref(rotated);
+        return 1;
+    }
+
+    g_object_unref(src);
+    g_object_unref(rotated);
+    return 0;
+}
+
+
+
+/*
 int main(int argc, char *argv[]) {
     if (argc != 4) {
         fprintf(stderr, "Usage: %s input.png angle|auto output.bmp\n", argv[0]);
@@ -129,4 +160,5 @@ int main(int argc, char *argv[]) {
     g_object_unref(rotated);
     return 0;
 }
+*/
 

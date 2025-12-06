@@ -409,14 +409,15 @@ int main()
     printf("%c\n", res+'A');
 
     free(inputs);
-    
+    */
 
 
     //test_score_dataset(&network, "../dataset/dataset_uppercase");
     
-    start_training_with_dataset(&network, "../dataset/dataset_uppercase");
+    /*
+    start_training_with_dataset(&network, "dataset_oat");
 
-    //save_network_weights(&network, "eliotsoumeillan2");
+    save_network_weights(&network, "oat");
     
 
 

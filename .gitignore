@@ -57,6 +57,8 @@ dkms.conf
 
 #dataset
 dataset_uppercase/
+dataset_oat/
+output/
 training_data/
 dataset_new/
 segmentation/chars/

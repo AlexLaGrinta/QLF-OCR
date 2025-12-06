@@ -11,11 +11,11 @@
 
 
 
-int preprocess_image(const char* path)
+int preprocess_image(const char* path, const char* outName)
 {
 
     const char* outDir = "temp";
-    const char* outName = "output.bmp";
+    //const char* outName = "output.bmp";
     char outPath[512];
 
     if (mkdir(outDir, 0777) != 0 && errno != EEXIST) {

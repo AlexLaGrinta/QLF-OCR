@@ -1,19 +1,23 @@
-.PHONY: all clean
+CC = gcc
+CFLAGS = -O2 -Wall -Wextra `pkg-config --cflags gdk-pixbuf-2.0` 
+LIBS = `pkg-config --libs gdk-pixbuf-2.0` -lm -lSDL2 -lSDL2_image
 
-all:
-	$(MAKE) -C Interface
-	$(MAKE) -C Preprocessing
-	$(MAKE) -C RotationPNG
-	$(MAKE) -C segmentation
-	$(MAKE) -C solver-cli
-	$(MAKE) -C XNORNetwork
+TARGET = selem
+SRC = main.c \
+      Preprocessing/preprocessing.c \
+      RotationPNG/rotate_png.c \
+      NeuralNetwork/neural_network.c \
+      NeuralNetwork/bmp_converter.c \
+      segmentation/segmentation.c \
+      segmentation/image_segmentation.c \
+      segmentation/char_segmentation.c
+
+all: $(TARGET)
+
+$(TARGET): $(SRC)
+	$(CC) $(CFLAGS) -o $(TARGET) $(SRC) $(LIBS)
 
 clean:
-	$(MAKE) -C Interface clean
-	$(MAKE) -C Preprocessing clean
-	$(MAKE) -C RotationPNG clean
-	$(MAKE) -C segmentation clean
-	$(MAKE) -C solver-cli clean
-	$(MAKE) -C XNORNetwork clean
+	rm -f $(TARGET)
 
 
