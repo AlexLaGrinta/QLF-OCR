@@ -241,98 +241,44 @@ void assign_character_zones(Character* chars, int num_chars,
 
 
 // ============================================================================
-// FILTRAGE DES LETTRES (SUPPRESSION DES PARASITES) - VERSION ASSOUPLIE
+// FILTRAGE DES LETTRES - DOUBLE STRATÉGIE SELON LA ZONE
 // ============================================================================
 
 Character* filter_letters(Character* chars, int* num_chars) {
     if (!chars || *num_chars == 0) return chars;
 
-    printf("\n🔍 Filtering characters (removing noise)...\n");
+    printf("\n🔍 Filtering characters with zone-specific strategies...\n");
     printf("  Initial count: %d characters\n", *num_chars);
 
-    // ========================================================================
-    // ÉTAPE 1: Calculer les statistiques globales
-    // ========================================================================
-    
-    float total_width = 0, total_height = 0, total_area = 0;
-    int valid_for_stats = 0;
-
-    // Première passe : calculer les moyennes en excluant les valeurs extrêmes
+    // Compter les caractères par zone
+    int grid_count = 0, wordlist_count = 0, unknown_count = 0;
     for (int i = 0; i < *num_chars; i++) {
-        int w = chars[i].width;
-        int h = chars[i].height;
-        int area = w * h;
-        
-        // Ignorer les très petits et très grands pour les stats
-        if (w >= 3 && h >= 5 && w <= 200 && h <= 200 && area >= 15) {
-            total_width += w;
-            total_height += h;
-            total_area += area;
-            valid_for_stats++;
-        }
-    }
-
-    if (valid_for_stats == 0) {
-        printf("  ⚠ No valid characters for statistics\n");
-        return chars;
-    }
-
-    float avg_width = total_width / valid_for_stats;
-    float avg_height = total_height / valid_for_stats;
-    float avg_area = total_area / valid_for_stats;
-
-    printf("  Statistics: avg_width=%.1f, avg_height=%.1f, avg_area=%.1f\n",
-           avg_width, avg_height, avg_area);
-
-    // ========================================================================
-    // ÉTAPE 2: Calculer l'écart-type pour détecter les outliers
-    // ========================================================================
-    
-    float var_width = 0, var_height = 0, var_area = 0;
-    
-    for (int i = 0; i < *num_chars; i++) {
-        int w = chars[i].width;
-        int h = chars[i].height;
-        int area = w * h;
-        
-        if (w >= 3 && h >= 5 && w <= 200 && h <= 200 && area >= 15) {
-            var_width += (w - avg_width) * (w - avg_width);
-            var_height += (h - avg_height) * (h - avg_height);
-            var_area += (area - avg_area) * (area - avg_area);
-        }
+        if (chars[i].zone == ZONE_GRID) grid_count++;
+        else if (chars[i].zone == ZONE_WORDLIST) wordlist_count++;
+        else unknown_count++;
     }
     
-    float std_width = sqrtf(var_width / valid_for_stats);
-    float std_height = sqrtf(var_height / valid_for_stats);
-    float std_area = sqrtf(var_area / valid_for_stats);
-
-    printf("  Std deviation: width=%.1f, height=%.1f, area=%.1f\n",
-           std_width, std_height, std_area);
+    printf("  Zones: GRID=%d, WORDLIST=%d, UNKNOWN=%d\n", 
+           grid_count, wordlist_count, unknown_count);
 
     // ========================================================================
-    // ÉTAPE 3: Fonction de calcul de densité (remplissage)
+    // FONCTIONS HELPER COMMUNES
     // ========================================================================
     
-    auto float calculate_density(Character* ch) {
-        if (!ch->data || ch->width == 0 || ch->height == 0) return 0.0f;
+    float calculate_density(Character* ch) {
+        if (!ch->data || ch->width == 0 || ch->height == 0) return 0.5f;
         
         int black_pixels = 0;
         int total_pixels = ch->width * ch->height;
         
         for (int i = 0; i < total_pixels; i++) {
-            if (ch->data[i] < 128) {  // Pixel sombre
-                black_pixels++;
-            }
+            if (ch->data[i] < 128) black_pixels++;
         }
         
         return (float)black_pixels / total_pixels;
     }
 
-    // ========================================================================
-    // ÉTAPE 4: Fonction de détection de composante connectée principale
-    // ========================================================================
-    
-    auto int count_connected_components(Character* ch) {
+    int count_connected_components(Character* ch) {
         if (!ch->data || ch->width == 0 || ch->height == 0) return 0;
         
         int w = ch->width;
@@ -345,10 +291,8 @@ Character* filter_letters(Character* chars, int* num_chars) {
                 int idx = y * w + x;
                 
                 if (ch->data[idx] < 128 && !visited[idx]) {
-                    // Nouvelle composante trouvée
                     num_components++;
                     
-                    // BFS simple pour marquer la composante
                     int* queue_x = malloc(w * h * sizeof(int));
                     int* queue_y = malloc(w * h * sizeof(int));
                     int front = 0, rear = 0;
@@ -363,7 +307,6 @@ Character* filter_letters(Character* chars, int* num_chars) {
                         int cy = queue_y[front];
                         front++;
                         
-                        // Vérifier les 8 voisins (connectivité 8)
                         int dx[] = {-1, 1, 0, 0, -1, -1, 1, 1};
                         int dy[] = {0, 0, -1, 1, -1, 1, -1, 1};
                         
@@ -395,16 +338,91 @@ Character* filter_letters(Character* chars, int* num_chars) {
     }
 
     // ========================================================================
-    // ÉTAPE 5: Filtrage avec critères multiples ASSOUPLIS
+    // STATISTIQUES POUR LA WORDLIST UNIQUEMENT
     // ========================================================================
     
-    int kept = 0;
-    int filtered_size = 0;
-    int filtered_aspect = 0;
-    int filtered_density = 0;
-    int filtered_components = 0;
-    int filtered_outlier = 0;
+    float total_width = 0, total_height = 0, total_area = 0;
+    int valid_for_stats = 0;
 
+    for (int i = 0; i < *num_chars; i++) {
+        if (chars[i].zone != ZONE_WORDLIST) continue;
+        
+        int w = chars[i].width;
+        int h = chars[i].height;
+        int area = w * h;
+        
+        if (w >= 1 && h >= 3 && w <= 300 && h <= 300 && area >= 5) {
+            total_width += w;
+            total_height += h;
+            total_area += area;
+            valid_for_stats++;
+        }
+    }
+
+    float avg_width = (valid_for_stats > 0) ? total_width / valid_for_stats : 0;
+    float avg_height = (valid_for_stats > 0) ? total_height / valid_for_stats : 0;
+    float avg_area = (valid_for_stats > 0) ? total_area / valid_for_stats : 0;
+
+    // Calculer écart-type pour wordlist
+    float var_width = 0, var_height = 0, var_area = 0;
+    
+    if (valid_for_stats > 0) {
+        for (int i = 0; i < *num_chars; i++) {
+            if (chars[i].zone != ZONE_WORDLIST) continue;
+            
+            int w = chars[i].width;
+            int h = chars[i].height;
+            int area = w * h;
+            
+            if (w >= 1 && h >= 3 && w <= 300 && h <= 300 && area >= 5) {
+                var_width += (w - avg_width) * (w - avg_width);
+                var_height += (h - avg_height) * (h - avg_height);
+                var_area += (area - avg_area) * (area - avg_area);
+            }
+        }
+        
+        var_width /= valid_for_stats;
+        var_height /= valid_for_stats;
+        var_area /= valid_for_stats;
+    }
+    
+    float std_width = sqrtf(var_width);
+    float std_height = sqrtf(var_height);
+    float std_area = sqrtf(var_area);
+
+    if (wordlist_count > 0) {
+        printf("  WORDLIST stats: avg_w=%.1f, avg_h=%.1f, std_w=%.1f, std_h=%.1f\n",
+               avg_width, avg_height, std_width, std_height);
+    }
+
+    // ========================================================================
+    // COMPTEURS DE FILTRAGE
+    // ========================================================================
+    
+    // Pour GRID (ultra-permissif)
+    int grid_filtered_null = 0;
+    int grid_filtered_single = 0;
+    int grid_filtered_gigantic = 0;
+    int grid_filtered_invalid = 0;
+    int grid_kept = 0;
+    
+    // Pour WORDLIST (permissif mais plus strict)
+    int wordlist_filtered_size = 0;
+    int wordlist_filtered_aspect = 0;
+    int wordlist_filtered_density = 0;
+    int wordlist_filtered_components = 0;
+    int wordlist_filtered_outlier = 0;
+    int wordlist_kept = 0;
+    
+    // Pour UNKNOWN (on applique le filtre wordlist)
+    int unknown_kept = 0;
+
+    int kept = 0;
+
+    // ========================================================================
+    // FILTRAGE PRINCIPAL - STRATÉGIE PAR ZONE
+    // ========================================================================
+    
     for (int i = 0; i < *num_chars; i++) {
         bool valid = true;
         int w = chars[i].width;
@@ -412,117 +430,380 @@ Character* filter_letters(Character* chars, int* num_chars) {
         int area = w * h;
         float aspect = (h > 0) ? (float)w / h : 0;
 
-        // ----------------------------------------------------------------
-        // CRITÈRE 1: Taille minimale et maximale absolue (ASSOUPLI)
-        // ----------------------------------------------------------------
-        if (w < 2 || h < 5) {  // Permet les I très fins (2px de large min)
-            valid = false;
-            filtered_size++;
-        }
-        
-        if (w > 200 || h > 200) {
-            valid = false;
-            filtered_size++;
-        }
-
-        // ----------------------------------------------------------------
-        // CRITÈRE 2: Surface minimale et maximale (ASSOUPLI)
-        // ----------------------------------------------------------------
-        if (area < 12) {  // Réduit de 20 à 12 pour accepter les I fins
-            valid = false;
-            filtered_size++;
-        }
-        
-        if (area > 15000) {  // Augmenté pour être moins strict
-            valid = false;
-            filtered_size++;
-        }
-
-        // ----------------------------------------------------------------
-        // CRITÈRE 3: Ratio hauteur/largeur (TRÈS ASSOUPLI pour I)
-        // ----------------------------------------------------------------
-        if (aspect > 0) {
-            // Accepte des ratios très extrêmes pour lettres comme I, l, i
-            if (aspect < 0.08 || aspect > 10.0) {  // Était 0.15/6.0
+        // ====================================================================
+        // ZONE GRID - FILTRE OPTIMISÉ (rejette le bruit, accepte I fins)
+        // ====================================================================
+        if (chars[i].zone == ZONE_GRID) {
+            // ----------------------------------------------------------------
+            // CRITÈRE 1: Dimensions invalides
+            // ----------------------------------------------------------------
+            if (w <= 0 || h <= 0) {
                 valid = false;
-                filtered_aspect++;
+                grid_filtered_null++;
             }
-        }
 
-        // ----------------------------------------------------------------
-        // CRITÈRE 4: Outliers statistiques (ASSOUPLI)
-        // ----------------------------------------------------------------
-        if (valid && valid_for_stats > 10) {
-            float z_width = fabsf(w - avg_width) / (std_width + 1);
-            float z_height = fabsf(h - avg_height) / (std_height + 1);
-            float z_area = fabsf(area - avg_area) / (std_area + 1);
-            
-            // Tolérance augmentée à 4.5 écarts-types
-            if (z_width > 4.5 || z_height > 4.5 || z_area > 5.0) {
+            // ----------------------------------------------------------------
+            // CRITÈRE 2: Rejeter les formes trop fragmentées/dispersées
+            // ----------------------------------------------------------------
+            if (valid && chars[i].data) {
+                int num_comp = count_connected_components(&chars[i]);
+                
+                // Si trop de composantes par rapport à la surface = bruit
+                if (num_comp > 0 && area > 0) {
+                    float comp_density = (float)num_comp / area;
+                    
+                    // Rejeter si plus de 1 composante pour 3 pixels (très fragmenté)
+                    if (comp_density > 0.33 || num_comp > 30) {
+                        valid = false;
+                        grid_filtered_invalid++;
+                    }
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // CRITÈRE 3: Rejeter les formes trop dispersées (bbox >> surface)
+            // ----------------------------------------------------------------
+            if (valid) {
+                int bbox_area = w * h;
+                
+                if (bbox_area > 0 && area > 0) {
+                    float fill_ratio = (float)area / bbox_area;
+                    
+                    // Rejeter si la forme occupe moins de 1% de sa bbox
+                    // (typique du bruit dispersé dans vos images)
+                    if (fill_ratio < 0.01 && area > 10) {
+                        valid = false;
+                        grid_filtered_invalid++;
+                    }
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // CRITÈRE 4: Rejeter densité extrêmement faible
+            // ----------------------------------------------------------------
+            if (valid && chars[i].data) {
+                float density = calculate_density(&chars[i]);
+                
+                // Rejeter si moins de 0.5% de pixels noirs
+                if (density < 0.005) {
+                    valid = false;
+                    grid_filtered_invalid++;
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // CRITÈRE 5: Rejeter les formes trop larges et plates
+            // ----------------------------------------------------------------
+            if (valid && w > 0 && h > 0) {
+                float aspect = (float)w / h;
+                
+                // Rejeter si largeur >> hauteur ET trop fragmenté
+                if (aspect > 10.0 && h < 5) {
+                    if (chars[i].data) {
+                        int num_comp = count_connected_components(&chars[i]);
+                        if (num_comp > 5) {
+                            valid = false;
+                            grid_filtered_invalid++;
+                        }
+                    }
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // CRITÈRE 6: Rejeter les très grandes surfaces vides
+            // ----------------------------------------------------------------
+            if (valid && area > 50000) {
+                if (chars[i].data) {
+                    float density = calculate_density(&chars[i]);
+                    
+                    // Grande surface mais très peu de contenu = bruit
+                    if (density < 0.02) {
+                        valid = false;
+                        grid_filtered_gigantic++;
+                    }
+                } else {
+                    valid = false;
+                    grid_filtered_gigantic++;
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // CRITÈRE 7: Rejeter dimensions extrêmes
+            // ----------------------------------------------------------------
+            if (valid && (w > 1500 || h > 1500)) {
                 valid = false;
-                filtered_outlier++;
+                grid_filtered_gigantic++;
             }
-        }
 
-        // ----------------------------------------------------------------
-        // CRITÈRE 5: Densité de pixels (ASSOUPLI)
-        // ----------------------------------------------------------------
-        if (valid && chars[i].data) {
-            float density = calculate_density(&chars[i]);
-            
-            // Plage élargie : 0.05 à 0.98 (au lieu de 0.08 à 0.95)
-            if (density < 0.05 || density > 0.98) {
+            // ----------------------------------------------------------------
+            // CRITÈRE 8: Rejeter surface minimale (pixel unique)
+            // ----------------------------------------------------------------
+            if (valid && area < 2) {
                 valid = false;
-                filtered_density++;
+                grid_filtered_single++;
             }
-        }
 
-        // ----------------------------------------------------------------
-        // CRITÈRE 6: Nombre de composantes connectées (ASSOUPLI)
-        // ----------------------------------------------------------------
-        if (valid && chars[i].data) {
-            int num_comp = count_connected_components(&chars[i]);
-            
-            // Accepte jusqu'à 5 composantes (i, j, %, etc.)
-            if (num_comp > 5 || num_comp == 0) {
-                valid = false;
-                filtered_components++;
-            }
-        }
+            // ================================================================
+            // EXCEPTIONS - ACCEPTER LES VRAIS CARACTÈRES
+            // ================================================================
 
-        // ----------------------------------------------------------------
-        // CRITÈRE BONUS: Détection spéciale pour lettres fines (I, l, i, 1)
-        // ----------------------------------------------------------------
-        if (!valid && w >= 2 && h >= 8) {
-            float thin_aspect = (float)h / w;
-            
-            // Si très fin et vertical (rapport h/w > 3)
-            if (thin_aspect > 3.0 && area >= 12) {
-                // Vérifier si c'est une forme verticale cohérente
+            // ----------------------------------------------------------------
+            // EXCEPTION 1: I très fin (1 pixel de large, hauteur >= 4)
+            // ----------------------------------------------------------------
+            if (!valid && w == 1 && h >= 4 && area >= 4) {
                 if (chars[i].data) {
                     float density = calculate_density(&chars[i]);
                     int num_comp = count_connected_components(&chars[i]);
                     
                     // Accepter si densité raisonnable et peu de composantes
-                    if (density >= 0.15 && density <= 0.90 && num_comp <= 3) {
-                        valid = true;  // Récupérer ce caractère
-                        filtered_size--;  // Corriger les stats
+                    if (density >= 0.15 && num_comp <= 3) {
+                        valid = true;
+                        if (grid_filtered_invalid > 0) grid_filtered_invalid--;
+                        else if (grid_filtered_single > 0) grid_filtered_single--;
                     }
                 }
             }
+
+            // ----------------------------------------------------------------
+            // EXCEPTION 2: I fin normal (2-3 pixels large, hauteur >= 5)
+            // ----------------------------------------------------------------
+            if (!valid && w >= 2 && w <= 3 && h >= 5 && area >= 8) {
+                if (chars[i].data) {
+                    float density = calculate_density(&chars[i]);
+                    int num_comp = count_connected_components(&chars[i]);
+                    
+                    // Accepter si bon ratio et peu fragmenté
+                    if (density >= 0.20 && num_comp <= 4) {
+                        valid = true;
+                        if (grid_filtered_invalid > 0) grid_filtered_invalid--;
+                        else if (grid_filtered_single > 0) grid_filtered_single--;
+                    }
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // EXCEPTION 3: Caractères verticaux allongés (ratio > 2.5)
+            // ----------------------------------------------------------------
+            if (!valid && w > 0 && h > 0 && h >= 6) {
+                float aspect = (float)h / w;
+                
+                if (aspect > 2.5 && aspect < 50) {
+                    if (chars[i].data) {
+                        float density = calculate_density(&chars[i]);
+                        int num_comp = count_connected_components(&chars[i]);
+                        int bbox_area = w * h;
+                        float fill_ratio = (float)area / bbox_area;
+                        
+                        // Accepter si forme compacte et peu fragmentée
+                        if (density >= 0.15 && num_comp <= 5 && fill_ratio >= 0.15) {
+                            valid = true;
+                            if (grid_filtered_invalid > 0) grid_filtered_invalid--;
+                        }
+                    }
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // EXCEPTION 4: Caractères compacts de taille normale
+            // ----------------------------------------------------------------
+            if (!valid && w >= 4 && w <= 50 && h >= 6 && h <= 50) {
+                if (chars[i].data) {
+                    float density = calculate_density(&chars[i]);
+                    int num_comp = count_connected_components(&chars[i]);
+                    int bbox_area = w * h;
+                    float fill_ratio = (float)area / bbox_area;
+                    
+                    // Accepter si compactopact et peu fragmenté
+                    if (density >= 0.10 && num_comp <= 10 && fill_ratio >= 0.10) {
+                        valid = true;
+                        if (grid_filtered_invalid > 0) grid_filtered_invalid--;
+                        else if (grid_filtered_gigantic > 0) grid_filtered_gigantic--;
+                    }
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // EXCEPTION 5: Points, accents, petits caractères (surface 3-20)
+            // ----------------------------------------------------------------
+            if (!valid && area >= 3 && area <= 20) {
+                if (chars[i].data) {
+                    float density = calculate_density(&chars[i]);
+                    int num_comp = count_connected_components(&chars[i]);
+                    int bbox_area = w * h;
+                    float fill_ratio = (float)area / bbox_area;
+                    
+                    // Accepter si très compact (point, accent, etc.)
+                    if (density >= 0.25 && num_comp <= 2 && fill_ratio >= 0.20) {
+                        valid = true;
+                        if (grid_filtered_single > 0) grid_filtered_single--;
+                        else if (grid_filtered_invalid > 0) grid_filtered_invalid--;
+                    }
+                }
+            }
+
+            // ----------------------------------------------------------------
+            // EXCEPTION 6: Caractères moyens bien formés (surface 20-5000)
+            // ----------------------------------------------------------------
+            if (!valid && area >= 20 && area <= 5000) {
+                if (chars[i].data) {
+                    float density = calculate_density(&chars[i]);
+                    int num_comp = count_connected_components(&chars[i]);
+                    int bbox_area = w * h;
+                    float fill_ratio = (float)area / bbox_area;
+                    
+                    // Accepter si bien formé
+                    if (density >= 0.08 && num_comp <= 15 && fill_ratio >= 0.08) {
+                        valid = true;
+                        if (grid_filtered_invalid > 0) grid_filtered_invalid--;
+                    }
+                }
+            }
+
+            if (valid) grid_kept++;
         }
 
-        // ----------------------------------------------------------------
-        // Garder ou rejeter le caractère
-        // ----------------------------------------------------------------
+
+        
+        // ====================================================================
+        // ZONE WORDLIST - FILTRE PERMISSIF MAIS PLUS STRICT
+        // ====================================================================
+        else if (chars[i].zone == ZONE_WORDLIST) {
+            // CRITÈRE 1: Taille minimale
+            if (w < 1 || h < 3) {
+                valid = false;
+                wordlist_filtered_size++;
+            }
+            
+            if (w > 500 || h > 500) {
+                valid = false;
+                wordlist_filtered_size++;
+            }
+
+            // CRITÈRE 2: Surface minimale
+            if (valid && area < 5) {
+                valid = false;
+                wordlist_filtered_size++;
+            }
+            
+            if (valid && area > 50000) {
+                valid = false;
+                wordlist_filtered_size++;
+            }
+
+            // CRITÈRE 3: Ratio hauteur/largeur
+            if (valid && aspect > 0) {
+                if (aspect < 0.02 || aspect > 50.0) {
+                    valid = false;
+                    wordlist_filtered_aspect++;
+                }
+            }
+
+            // CRITÈRE 4: Outliers statistiques
+            if (valid && valid_for_stats > 20) {
+                float z_width = fabsf(w - avg_width) / (std_width + 1);
+                float z_height = fabsf(h - avg_height) / (std_height + 1);
+                float z_area = fabsf(area - avg_area) / (std_area + 1);
+                
+                if (z_width > 6.0 || z_height > 6.0 || z_area > 7.0) {
+                    valid = false;
+                    wordlist_filtered_outlier++;
+                }
+            }
+
+            // CRITÈRE 5: Densité
+            if (valid && chars[i].data) {
+                float density = calculate_density(&chars[i]);
+                
+                if (density < 0.02 || density > 0.99) {
+                    valid = false;
+                    wordlist_filtered_density++;
+                }
+            }
+
+            // CRITÈRE 6: Composantes connectées
+            if (valid && chars[i].data) {
+                int num_comp = count_connected_components(&chars[i]);
+                
+                if (num_comp > 10) {
+                    valid = false;
+                    wordlist_filtered_components++;
+                }
+            }
+
+            // EXCEPTION 1: Formes très fines/larges
+            if (!valid && area >= 8) {
+                float thin_aspect = (h > w) ? ((float)h / w) : ((float)w / h);
+                
+                if (thin_aspect > 2.0) {
+                    if (chars[i].data) {
+                        float density = calculate_density(&chars[i]);
+                        int num_comp = count_connected_components(&chars[i]);
+                        
+                        if (density >= 0.05 && density <= 0.95 && num_comp <= 5) {
+                            valid = true;
+                            
+                            if (wordlist_filtered_size > 0) wordlist_filtered_size--;
+                            if (wordlist_filtered_aspect > 0) wordlist_filtered_aspect--;
+                        }
+                    }
+                }
+            }
+
+            // EXCEPTION 2: Ponctuation
+            if (!valid && area >= 5 && area <= 30) {
+                if (chars[i].data) {
+                    float density = calculate_density(&chars[i]);
+                    
+                    if (density >= 0.20 && density <= 0.95) {
+                        int num_comp = count_connected_components(&chars[i]);
+                        
+                        if (num_comp <= 2) {
+                            valid = true;
+                            if (wordlist_filtered_size > 0) wordlist_filtered_size--;
+                            if (wordlist_filtered_density > 0) wordlist_filtered_density--;
+                        }
+                    }
+                }
+            }
+
+            if (valid) wordlist_kept++;
+        }
+        
+        // ====================================================================
+        // ZONE UNKNOWN - Appliquer le filtre wordlist
+        // ====================================================================
+        else {
+            // Même logique que WORDLIST
+            if (w < 1 || h < 3 || w > 500 || h > 500 || area < 5 || area > 50000) {
+                valid = false;
+            }
+            
+            if (valid && aspect > 0 && (aspect < 0.02 || aspect > 50.0)) {
+                valid = false;
+            }
+            
+            if (valid && chars[i].data) {
+                float density = calculate_density(&chars[i]);
+                if (density < 0.02 || density > 0.99) {
+                    valid = false;
+                }
+            }
+
+            if (valid) unknown_kept++;
+        }
+
+        // ====================================================================
+        // GARDER OU REJETER
+        // ====================================================================
         if (valid) {
             if (kept != i) {
                 chars[kept] = chars[i];
             }
             kept++;
         } else {
-            // Libérer la mémoire du caractère filtré
-            free(chars[i].data);
+            if (chars[i].data) {
+                free(chars[i].data);
+            }
         }
     }
 
@@ -532,23 +813,63 @@ Character* filter_letters(Character* chars, int* num_chars) {
     // RAPPORT DE FILTRAGE
     // ========================================================================
     
-    int total_filtered = filtered_size + filtered_aspect + filtered_density + 
-                         filtered_components + filtered_outlier;
+    printf("\n  ✅ Filtering results by zone:\n\n");
     
-    printf("\n  Filtering results:\n");
-    printf("    ✓ Kept: %d characters\n", kept);
-    printf("    ✗ Filtered: %d characters\n", total_filtered);
+    // Rapport GRID
+    int grid_total_filtered = grid_filtered_null + grid_filtered_single + 
+                              grid_filtered_gigantic + grid_filtered_invalid;
     
-    if (total_filtered > 0) {
-        printf("      - Size issues: %d\n", filtered_size);
-        printf("      - Aspect ratio: %d\n", filtered_aspect);
-        printf("      - Density: %d\n", filtered_density);
-        printf("      - Components: %d\n", filtered_components);
-        printf("      - Outliers: %d\n", filtered_outlier);
+    printf("  📊 GRID (ULTRA-PERMISSIVE):\n");
+    printf("    ✓ Kept: %d / %d (%.1f%%)\n", 
+           grid_kept, grid_kept + grid_total_filtered,
+           (grid_kept + grid_total_filtered > 0) ? 
+           (100.0f * grid_kept / (grid_kept + grid_total_filtered)) : 0);
+    
+    if (grid_total_filtered > 0) {
+        printf("    ✗ Filtered: %d (only extreme noise)\n", grid_total_filtered);
+        if (grid_filtered_null > 0) printf("      - Invalid dimensions: %d\n", grid_filtered_null);
+        if (grid_filtered_single > 0) printf("      - Single white pixel: %d\n", grid_filtered_single);
+        if (grid_filtered_gigantic > 0) printf("      - Gigantic blocks: %d\n", grid_filtered_gigantic);
+        if (grid_filtered_invalid > 0) printf("      - Corrupted data: %d\n", grid_filtered_invalid);
     }
+    
+    // Rapport WORDLIST
+    int wordlist_total_filtered = wordlist_filtered_size + wordlist_filtered_aspect + 
+                                   wordlist_filtered_density + wordlist_filtered_components + 
+                                   wordlist_filtered_outlier;
+    
+    printf("\n  📝 WORDLIST (PERMISSIVE):\n");
+    printf("    ✓ Kept: %d / %d (%.1f%%)\n", 
+           wordlist_kept, wordlist_kept + wordlist_total_filtered,
+           (wordlist_kept + wordlist_total_filtered > 0) ? 
+           (100.0f * wordlist_kept / (wordlist_kept + wordlist_total_filtered)) : 0);
+    
+    if (wordlist_total_filtered > 0) {
+        printf("    ✗ Filtered: %d\n", wordlist_total_filtered);
+        if (wordlist_filtered_size > 0) printf("      - Size issues: %d\n", wordlist_filtered_size);
+        if (wordlist_filtered_aspect > 0) printf("      - Aspect ratio: %d\n", wordlist_filtered_aspect);
+        if (wordlist_filtered_density > 0) printf("      - Density: %d\n", wordlist_filtered_density);
+        if (wordlist_filtered_components > 0) printf("      - Components: %d\n", wordlist_filtered_components);
+        if (wordlist_filtered_outlier > 0) printf("      - Outliers: %d\n", wordlist_filtered_outlier);
+    }
+    
+    if (unknown_count > 0) {
+        printf("\n  ❓ UNKNOWN: kept %d\n", unknown_kept);
+    }
+    
+    printf("\n  🎯 Total kept: %d characters\n", *num_chars);
 
-    return realloc(chars, kept * sizeof(Character));
+    // Réduire la mémoire
+    if (kept > 0) {
+        Character* resized = realloc(chars, kept * sizeof(Character));
+        return resized ? resized : chars;
+    }
+    
+    free(chars);
+    return NULL;
 }
+
+
 
 // ============================================================================
 // GROUPING CHARACTERS INTO WORDS

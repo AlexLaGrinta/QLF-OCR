@@ -44,6 +44,7 @@ void assign_character_zones(Character* chars, int num_chars,
 
 Character* filter_letters(Character* chars, int* num_chars);
 
+
 void save_character_bmp(Character* ch, const char* filename, int target_size);
 
 void free_characters(Character* chars, int num_chars);

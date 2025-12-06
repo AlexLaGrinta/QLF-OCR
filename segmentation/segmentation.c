@@ -575,7 +575,7 @@ SegmentationResult* perform_segmentation(const char *path) {
                 if (new_word) {
                     int word_len = i - word_start;
                     
-                    if (word_len > 1) {
+                    if (word_len > 2) {
                         // Créer le dossier pour ce mot
                         char word_dir[512];
                         snprintf(word_dir, sizeof(word_dir), 
