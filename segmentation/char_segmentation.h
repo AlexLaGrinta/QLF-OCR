@@ -25,6 +25,18 @@ typedef struct {
     int count;
 } CharacterList;
 
+typedef struct {
+    int word_id;
+    Character* letters;
+    int num_letters;
+    int x, y, width, height;
+} Word;
+
+// Nouvelle fonction
+Word* group_characters_into_words(Character* chars, int num_chars, int* num_words);
+void free_words(Word* words, int num_words);
+
+
 Character* find_characters_in_grid(BinaryImage* bin, int* num_chars, int offset_x, int offset_y);
 
 void assign_character_zones(Character* chars, int num_chars, 

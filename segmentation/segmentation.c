@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <sys/stat.h>
@@ -7,16 +8,192 @@
 #include "image_segmentation.h"
 #include "char_segmentation.h"
 
-int perform_segmentation(const char *path) {
+// ============================================================================
+// STRUCTURES FOR ROW GROUPING AND PATH STORAGE
+// ============================================================================
+
+typedef struct {
+    int* indices;
+    int count;
+    int capacity;
+    int avg_y;
+} Row;
+
+// Structure pour stocker un chemin de lettre
+typedef struct {
+    char path[512];
+} LetterPath;
+
+// Structure pour stocker un mot (liste de chemins de lettres)
+typedef struct {
+    LetterPath* letters;
+    int letter_count;
+} Word2;
+
+// Structure pour stocker tous les résultats de segmentation
+typedef struct {
+    LetterPath* grid_letters;
+    int grid_letter_count;
+    Word2* words;
+    int word_count;
+} SegmentationResult;
+
+// ============================================================================
+// FUNCTIONS FOR RESULT MANAGEMENT
+// ============================================================================
+
+SegmentationResult* create_segmentation_result() {
+    SegmentationResult* result = malloc(sizeof(SegmentationResult));
+    if (!result) return NULL;
+    
+    result->grid_letters = NULL;
+    result->grid_letter_count = 0;
+    result->words = NULL;
+    result->word_count = 0;
+    
+    return result;
+}
+
+void free_segmentation_result(SegmentationResult* result) {
+    if (!result) return;
+    
+    if (result->grid_letters) {
+        free(result->grid_letters);
+    }
+    
+    if (result->words) {
+        for (int i = 0; i < result->word_count; i++) {
+            if (result->words[i].letters) {
+                free(result->words[i].letters);
+            }
+        }
+        free(result->words);
+    }
+    
+    free(result);
+}
+
+void print_segmentation_result(SegmentationResult* result) {
+    if (!result) {
+        printf("No result to display\n");
+        return;
+    }
+    
+    printf("\n========================================\n");
+    printf("SEGMENTATION RESULT\n");
+    printf("========================================\n\n");
+    
+    // Afficher la grille
+    printf("GRID (%d letters):\n", result->grid_letter_count);
+    printf("[\n");
+    for (int i = 0; i < result->grid_letter_count; i++) {
+        printf("  \"%s\"", result->grid_letters[i].path);
+        if (i < result->grid_letter_count - 1) {
+            printf(",\n");
+        } else {
+            printf("\n");
+        }
+    }
+    printf("]\n\n");
+    
+    // Afficher les mots
+    printf("WORDS TO FIND (%d words):\n", result->word_count);
+    printf("[\n");
+    for (int w = 0; w < result->word_count; w++) {
+        printf("  Word %d (%d letters): [\n", w, result->words[w].letter_count);
+        for (int l = 0; l < result->words[w].letter_count; l++) {
+            printf("    \"%s\"", result->words[w].letters[l].path);
+            if (l < result->words[w].letter_count - 1) {
+                printf(",\n");
+            } else {
+                printf("\n");
+            }
+        }
+        printf("  ]");
+        if (w < result->word_count - 1) {
+            printf(",\n");
+        } else {
+            printf("\n");
+        }
+    }
+    printf("]\n");
+    printf("========================================\n\n");
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+static int compare_chars_by_position(const void* a, const void* b) {
+    Character* c1 = (Character*)a;
+    Character* c2 = (Character*)b;
+    
+    // D'abord trier par ligne (y), puis par colonne (x)
+    int y_diff = c1->y - c2->y;
+    if (abs(y_diff) > 20) { // Tolérance pour la même ligne
+        return y_diff;
+    }
+    return c1->x - c2->x;
+}
+
+static float calculate_avg_letter_width(Character* chars, int count) {
+    if (count == 0) return 0;
+    
+    float total = 0;
+    for (int i = 0; i < count; i++) {
+        total += chars[i].width;
+    }
+    return total / count;
+}
+
+static float calculate_avg_letter_height(Character* chars, int count) {
+    if (count == 0) return 0;
+    
+    float total = 0;
+    for (int i = 0; i < count; i++) {
+        total += chars[i].height;
+    }
+    return total / count;
+}
+
+static bool are_letters_in_same_word(Character* c1, Character* c2, float avg_width, float avg_height) {
+    // Calculer la distance horizontale entre les deux lettres
+    int horizontal_gap = c2->x - (c1->x + c1->width);
+    
+    // Calculer la différence verticale (alignement)
+    int vertical_diff = abs(c1->y - c2->y);
+    
+    // Critères pour appartenir au même mot :
+    // 1. Alignement vertical : différence < 30% de la hauteur moyenne
+    // 2. Proximité horizontale : gap < 150% de la largeur moyenne
+    
+    float max_vertical_diff = avg_height * 0.3f;
+    float max_horizontal_gap = avg_width * 1.5f;
+    
+    bool vertically_aligned = (vertical_diff < max_vertical_diff);
+    bool horizontally_close = (horizontal_gap >= -5 && horizontal_gap < max_horizontal_gap);
+    
+    return vertically_aligned && horizontally_close;
+}
+
+SegmentationResult* perform_segmentation(const char *path) {
+    SegmentationResult* result = create_segmentation_result();
+    if (!result) {
+        fprintf(stderr, "Failed to allocate result structure\n");
+        return NULL;
+    }
+    
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         fprintf(stderr, "SDL_Init Error: %s\n", SDL_GetError());
-        return 1;
+        free_segmentation_result(result);
+        return NULL;
     }
 
     if (IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG) == 0) {
         fprintf(stderr, "IMG_Init Error: %s\n", SDL_GetError());
         SDL_Quit();
-        return 1;
+        free_segmentation_result(result);
+        return NULL;
     }
 
     SDL_Surface* img = IMG_Load(path);
@@ -24,7 +201,8 @@ int perform_segmentation(const char *path) {
         fprintf(stderr, "Failed to load: %s\n", IMG_GetError());
         IMG_Quit();
         SDL_Quit();
-        return 1;
+        free_segmentation_result(result);
+        return NULL;
     }
 
     // ========================================================================
@@ -37,7 +215,8 @@ int perform_segmentation(const char *path) {
         SDL_FreeSurface(img);
         IMG_Quit();
         SDL_Quit();
-        return 1;
+        free_segmentation_result(result);
+        return NULL;
     }
 
     // ========================================================================
@@ -55,7 +234,8 @@ int perform_segmentation(const char *path) {
         SDL_FreeSurface(img);
         IMG_Quit();
         SDL_Quit();
-        return 1;
+        free_segmentation_result(result);
+        return NULL;
     }
 
     // ========================================================================
@@ -71,7 +251,8 @@ int perform_segmentation(const char *path) {
         SDL_FreeSurface(img);
         IMG_Quit();
         SDL_Quit();
-        return 1;
+        free_segmentation_result(result);
+        return NULL;
     }
 
     // ========================================================================
@@ -87,7 +268,7 @@ int perform_segmentation(const char *path) {
     chars = filter_letters(chars, &num_chars);
 
     // ========================================================================
-    // STEP 6: CREATION OF THE OUPUT FILES
+    // STEP 6: CREATION OF THE OUTPUT FILES
     // ========================================================================
 
     #ifdef _WIN32
@@ -101,28 +282,367 @@ int perform_segmentation(const char *path) {
     #endif
 
     // ========================================================================
-    // STEP 7: SAFEGUARDING OF THE CHARACTERS
+    // STEP 7: SAVE GRID LETTERS (ordered by rows and columns)
     // ========================================================================
 
+    // Compter les caractères de la grille
     int grid_count = 0;
-    int list_count = 0;
-
     for (int i = 0; i < num_chars; i++) {
-        char filename[512];
+        if (chars[i].zone == ZONE_GRID) grid_count++;
+    }
 
-        if (chars[i].zone == ZONE_GRID) {
-            snprintf(filename, sizeof(filename), "output/grid_letters/letter_%04d.bmp", grid_count);
-            save_character_bmp(&chars[i], filename, 28);
-            grid_count++;
-        } else if (chars[i].zone == ZONE_WORDLIST) {
-            snprintf(filename, sizeof(filename), "output/wordlist_letters/letter_%04d.bmp", list_count);
-            save_character_bmp(&chars[i], filename, 28);
-            list_count++;
+    if (grid_count > 0) {
+        printf("\n✓ Processing %d grid characters...\n", grid_count);
+        
+        // Allouer l'espace pour les chemins de la grille
+        result->grid_letters = malloc(grid_count * sizeof(LetterPath));
+        result->grid_letter_count = 0;
+        
+        // Extraire les caractères de la grille
+        Character* grid_chars = malloc(grid_count * sizeof(Character));
+        int g_idx = 0;
+        
+        for (int i = 0; i < num_chars; i++) {
+            if (chars[i].zone == ZONE_GRID) {
+                grid_chars[g_idx++] = chars[i];
+            }
         }
+
+        // Trier par position (y puis x)
+        qsort(grid_chars, grid_count, sizeof(Character), compare_chars_by_position);
+
+        // Calculer la hauteur moyenne des lettres pour détecter les lignes
+        float avg_height = calculate_avg_letter_height(grid_chars, grid_count);
+        printf("  Average letter height: %.1f pixels\n", avg_height);
+
+        // Grouper par lignes
+        typedef struct {
+            int* indices;
+            int count;
+            int capacity;
+            int avg_y;
+        } GridRow;
+
+        GridRow* rows = malloc(grid_count * sizeof(GridRow));
+        int num_rows = 0;
+
+        // Tolérance pour considérer deux lettres sur la même ligne
+        float row_tolerance = avg_height * 0.3f;
+
+        // Grouper les lettres par ligne
+        for (int i = 0; i < grid_count; i++) {
+            bool found_row = false;
+            
+            // Chercher si la lettre appartient à une ligne existante
+            for (int r = 0; r < num_rows; r++) {
+                if (abs(grid_chars[i].y - rows[r].avg_y) < row_tolerance) {
+                    // Ajouter à cette ligne
+                    if (rows[r].count >= rows[r].capacity) {
+                        rows[r].capacity = (rows[r].capacity == 0) ? 10 : rows[r].capacity * 2;
+                        rows[r].indices = realloc(rows[r].indices, rows[r].capacity * sizeof(int));
+                    }
+                    rows[r].indices[rows[r].count++] = i;
+                    
+                    // Mettre à jour la position Y moyenne de la ligne
+                    int total_y = 0;
+                    for (int j = 0; j < rows[r].count; j++) {
+                        total_y += grid_chars[rows[r].indices[j]].y;
+                    }
+                    rows[r].avg_y = total_y / rows[r].count;
+                    
+                    found_row = true;
+                    break;
+                }
+            }
+            
+            // Si aucune ligne trouvée, créer une nouvelle ligne
+            if (!found_row) {
+                rows[num_rows].indices = malloc(10 * sizeof(int));
+                rows[num_rows].capacity = 10;
+                rows[num_rows].count = 1;
+                rows[num_rows].indices[0] = i;
+                rows[num_rows].avg_y = grid_chars[i].y;
+                num_rows++;
+            }
+        }
+
+        printf("  Detected %d rows in grid\n", num_rows);
+
+        // Trier les lignes de haut en bas
+        for (int i = 0; i < num_rows - 1; i++) {
+            for (int j = i + 1; j < num_rows; j++) {
+                if (rows[i].avg_y > rows[j].avg_y) {
+                    GridRow temp = rows[i];
+                    rows[i] = rows[j];
+                    rows[j] = temp;
+                }
+            }
+        }
+
+        // Pour chaque ligne, trier les lettres de gauche à droite et sauvegarder
+        int letter_counter = 0;
+        
+        for (int r = 0; r < num_rows; r++) {
+            // Trier les indices par position X (gauche à droite)
+            for (int i = 0; i < rows[r].count - 1; i++) {
+                for (int j = i + 1; j < rows[r].count; j++) {
+                    int idx_i = rows[r].indices[i];
+                    int idx_j = rows[r].indices[j];
+                    
+                    if (grid_chars[idx_i].x > grid_chars[idx_j].x) {
+                        int temp = rows[r].indices[i];
+                        rows[r].indices[i] = rows[r].indices[j];
+                        rows[r].indices[j] = temp;
+                    }
+                }
+            }
+            
+            // Sauvegarder les lettres de cette ligne dans l'ordre
+            printf("  Row %d: %d letters at y=%d\n", r, rows[r].count, rows[r].avg_y);
+            
+            for (int i = 0; i < rows[r].count; i++) {
+                int idx = rows[r].indices[i];
+                char filename[512];
+                snprintf(filename, sizeof(filename), "output/grid_letters/letter_%04d.bmp", letter_counter);
+                save_character_bmp(&grid_chars[idx], filename, 28);
+                
+                // Stocker le chemin dans le résultat
+                snprintf(result->grid_letters[letter_counter].path, 512, "%s", filename);
+                letter_counter++;
+            }
+        }
+
+        result->grid_letter_count = letter_counter;
+        printf("\n✓ Saved %d grid letters in order to output/grid_letters/\n", letter_counter);
+
+        // Libérer la mémoire
+        for (int r = 0; r < num_rows; r++) {
+            free(rows[r].indices);
+        }
+        free(rows);
+        free(grid_chars);
+    } else {
+        printf("  No grid characters detected\n");
     }
 
     // ========================================================================
-    // STEP 8: VISUALIZATION
+    // STEP 8: GROUP WORDLIST CHARACTERS INTO WORDS (IMPROVED - HORIZONTAL)
+    // ========================================================================
+
+    // Compter les caractères de la wordlist
+    int list_count = 0;
+    for (int i = 0; i < num_chars; i++) {
+        if (chars[i].zone == ZONE_WORDLIST) list_count++;
+    }
+
+    if (list_count > 0) {
+        printf("\n✓ Processing %d wordlist characters...\n", list_count);
+        
+        // Extraire les caractères de la wordlist
+        Character* list_chars = malloc(list_count * sizeof(Character));
+        int l_idx = 0;
+        
+        for (int i = 0; i < num_chars; i++) {
+            if (chars[i].zone == ZONE_WORDLIST) {
+                list_chars[l_idx++] = chars[i];
+            }
+        }
+
+        // Trier par position (y puis x pour lecture de gauche à droite)
+        qsort(list_chars, list_count, sizeof(Character), compare_chars_by_position);
+
+        // Calculer les statistiques pour la détection des mots
+        float avg_width = calculate_avg_letter_width(list_chars, list_count);
+        float avg_height = calculate_avg_letter_height(list_chars, list_count);
+        
+        // Distance maximale entre deux lettres du même mot (horizontalement)
+        float max_letter_spacing = avg_width * 1.5f;
+        
+        // Tolérance verticale pour considérer deux lettres sur la même ligne
+        float row_tolerance = avg_height * 0.4f;
+
+        printf("  Average letter width: %.1f, height: %.1f\n", avg_width, avg_height);
+        printf("  Max spacing between letters: %.1f\n", max_letter_spacing);
+        printf("  Row tolerance: %.1f\n", row_tolerance);
+
+        // Grouper les lettres par lignes horizontales
+        typedef struct {
+            int* indices;
+            int count;
+            int capacity;
+            int avg_y;
+        } WordlistRow;
+
+        WordlistRow* rows = malloc(list_count * sizeof(WordlistRow));
+        int num_rows = 0;
+
+        for (int i = 0; i < list_count; i++) {
+            bool found_row = false;
+            
+            // Chercher une ligne existante pour cette lettre
+            for (int r = 0; r < num_rows; r++) {
+                int first_idx = rows[r].indices[0];
+                float y_diff = abs(list_chars[i].y - list_chars[first_idx].y);
+                
+                if (y_diff <= row_tolerance) {
+                    // Ajouter à cette ligne
+                    if (rows[r].count >= rows[r].capacity) {
+                        rows[r].capacity *= 2;
+                        rows[r].indices = realloc(rows[r].indices, 
+                                                 rows[r].capacity * sizeof(int));
+                    }
+                    rows[r].indices[rows[r].count++] = i;
+                    found_row = true;
+                    break;
+                }
+            }
+            
+            // Créer une nouvelle ligne si nécessaire
+            if (!found_row) {
+                rows[num_rows].indices = malloc(10 * sizeof(int));
+                rows[num_rows].capacity = 10;
+                rows[num_rows].count = 1;
+                rows[num_rows].indices[0] = i;
+                rows[num_rows].avg_y = list_chars[i].y;
+                num_rows++;
+            }
+        }
+
+        printf("  Found %d rows in wordlist\n", num_rows);
+
+        // Trier les lignes de haut en bas
+        for (int i = 0; i < num_rows - 1; i++) {
+            for (int j = i + 1; j < num_rows; j++) {
+                int y1 = list_chars[rows[i].indices[0]].y;
+                int y2 = list_chars[rows[j].indices[0]].y;
+                if (y1 > y2) {
+                    WordlistRow temp = rows[i];
+                    rows[i] = rows[j];
+                    rows[j] = temp;
+                }
+            }
+        }
+
+        // Pour chaque ligne, trier les lettres de gauche à droite
+        for (int r = 0; r < num_rows; r++) {
+            for (int i = 0; i < rows[r].count - 1; i++) {
+                for (int j = i + 1; j < rows[r].count; j++) {
+                    int idx_i = rows[r].indices[i];
+                    int idx_j = rows[r].indices[j];
+                    
+                    if (list_chars[idx_i].x > list_chars[idx_j].x) {
+                        int temp = rows[r].indices[i];
+                        rows[r].indices[i] = rows[r].indices[j];
+                        rows[r].indices[j] = temp;
+                    }
+                }
+            }
+        }
+
+        // Traiter chaque ligne pour extraire les mots
+        int word_num = 0;
+        
+        // Allouer un tableau temporaire pour les mots (taille max = nombre de lettres)
+        Word2* temp_words = malloc(list_count * sizeof(Word));
+
+        for (int r = 0; r < num_rows; r++) {
+            printf("\n  Processing row %d (%d letters at y=%d):\n", 
+                   r, rows[r].count, list_chars[rows[r].indices[0]].y);
+
+            // Dans chaque ligne, grouper les lettres en mots basé sur l'espacement horizontal
+            int word_start = 0;
+            
+            for (int i = 1; i <= rows[r].count; i++) {
+                bool new_word = false;
+                
+                if (i == rows[r].count) {
+                    // Fin de la ligne = fin du dernier mot
+                    new_word = true;
+                } else {
+                    // Vérifier l'espacement horizontal entre deux lettres consécutives
+                    int idx_prev = rows[r].indices[i - 1];
+                    int idx_curr = rows[r].indices[i];
+                    
+                    int prev_right = list_chars[idx_prev].x + list_chars[idx_prev].width;
+                    int curr_left = list_chars[idx_curr].x;
+                    float horizontal_gap = curr_left - prev_right;
+                    
+                    if (horizontal_gap > max_letter_spacing) {
+                        new_word = true;
+                    }
+                }
+                
+                if (new_word) {
+                    int word_len = i - word_start;
+                    
+                    if (word_len > 1) {
+                        // Créer le dossier pour ce mot
+                        char word_dir[512];
+                        snprintf(word_dir, sizeof(word_dir), 
+                                "output/wordlist_letters/word_%03d", word_num);
+                        
+                        #ifdef _WIN32
+                            _mkdir(word_dir);
+                        #else
+                            mkdir(word_dir, 0755);
+                        #endif
+
+                        // Initialiser le mot dans le résultat
+                        temp_words[word_num].letter_count = word_len;
+                        temp_words[word_num].letters = malloc(word_len * sizeof(LetterPath));
+
+                        // Calculer les coordonnées du mot
+                        int first_idx = rows[r].indices[word_start];
+                        int last_idx = rows[r].indices[i - 1];
+                        int word_x = list_chars[first_idx].x;
+                        int word_y = list_chars[first_idx].y;
+                        int word_width = (list_chars[last_idx].x + list_chars[last_idx].width) - word_x;
+                        
+                        // Sauvegarder chaque lettre du mot
+                        for (int j = 0; j < word_len; j++) {
+                            int letter_idx = rows[r].indices[word_start + j];
+                            char filename[512];
+                            snprintf(filename, sizeof(filename), 
+                                    "%s/letter_%02d.bmp", word_dir, j);
+                            save_character_bmp(&list_chars[letter_idx], filename, 28);
+                            
+                            // Stocker le chemin dans le résultat
+                            snprintf(temp_words[word_num].letters[j].path, 512, "%s", filename);
+                        }
+
+                        printf("    Word %d: %d letters at position (%d, %d), width=%d -> %s\n", 
+                               word_num, word_len, word_x, word_y, word_width, word_dir);
+                        
+                        word_num++;
+                    }
+                    
+                    word_start = i;
+                }
+            }
+        }
+
+        // Copier les mots dans le résultat final
+        result->word_count = word_num;
+        if (word_num > 0) {
+            result->words = malloc(word_num * sizeof(Word));
+            memcpy(result->words, temp_words, word_num * sizeof(Word));
+        }
+        free(temp_words);
+
+        printf("\n✓ Saved %d words from wordlist to output/wordlist_letters/\n", word_num);
+        
+        // Libérer la mémoire
+        for (int r = 0; r < num_rows; r++) {
+            free(rows[r].indices);
+        }
+        free(rows);
+        free(list_chars);
+    } else {
+        printf("  No wordlist characters detected\n");
+    }
+
+    // ========================================================================
+    // STEP 9: VISUALIZATION
     // ========================================================================
 
     SDL_Surface* rgba_img = SDL_ConvertSurfaceFormat(img, SDL_PIXELFORMAT_RGBA32, 0);
@@ -200,7 +720,7 @@ int perform_segmentation(const char *path) {
     IMG_Quit();
     SDL_Quit();
 
-    return 0;
+    return result;
 }
 
 int main(int argc, char* argv[]) {
@@ -209,6 +729,19 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    return perform_segmentation(argv[1]);
+    SegmentationResult* result = perform_segmentation(argv[1]);
+    
+    if (!result) {
+        fprintf(stderr, "Segmentation failed\n");
+        return EXIT_FAILURE;
+    }
+    
+    // Afficher les résultats
+    print_segmentation_result(result);
+    
+    // Libérer la mémoire
+    free_segmentation_result(result);
+
+    return EXIT_SUCCESS;
 }
 

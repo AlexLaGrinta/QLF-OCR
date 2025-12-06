@@ -558,6 +558,8 @@ static WordListCandidate analyze_wordlist_cluster_density(ComponentList* comps, 
     return candidate;
 }
 
+
+
 // ============================================================================
 // DÉTECTION MAIN ZONES
 // ============================================================================
