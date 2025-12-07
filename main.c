@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
   }
 
   NeuralNetwork network;
-  load_network_weights(&network, "temp/oat.bin");
+  load_network_weights(&network, "weights/the_end.bin");
 
   // 1. GRID PREDICTION
   printf("\n--- GRID PREDICTION ---\n");

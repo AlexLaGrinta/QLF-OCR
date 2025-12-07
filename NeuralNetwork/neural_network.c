@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <math.h>
+#include "err.h"
 #include <time.h>
 #include "neural_network.h"
 #include "bmp_converter.h"
@@ -238,10 +239,12 @@ void save_network_weights(NeuralNetwork* network, const char* path)
     //strncat(file_path, path, 24);
 
 
-    snprintf(file_path, sizeof(file_path), "../temp/%s.bin", path);
+    snprintf(file_path, sizeof(file_path), "../weights/%s.bin", path);
 
 
     FILE* f = fopen(file_path, "wb");
+
+    if (f == NULL) errx(EXIT_FAILURE, "weights file not found");
 
     /*
     double weights_input_hidden[INPUT_SIZE][HIDDEN_SIZE];
@@ -417,7 +420,7 @@ int main()
     /*
     start_training_with_dataset(&network, "dataset_oat");
 
-    save_network_weights(&network, "oat");
+    save_network_weights(&network, "the_end");
     
 
 

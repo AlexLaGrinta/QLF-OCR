@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -O2 -Wall -Wextra `pkg-config --cflags gdk-pixbuf-2.0` 
+CFLAGS = -O2 -Wall -Wextra `pkg-config --cflags gdk-pixbuf-2.0` -g -fsanitize=address
 LIBS = `pkg-config --libs gdk-pixbuf-2.0` -lm -lSDL2 -lSDL2_image
 
 TARGET = selem
@@ -18,6 +18,5 @@ $(TARGET): $(SRC)
 	$(CC) $(CFLAGS) -o $(TARGET) $(SRC) $(LIBS)
 
 clean:
-	rm -f $(TARGET)
-
+	rm -rf $(TARGET) output/
 
