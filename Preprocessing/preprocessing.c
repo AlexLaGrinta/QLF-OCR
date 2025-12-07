@@ -55,7 +55,7 @@ int preprocess_image(const char* path, const char* outName)
     grayscale_inplace(img);
 
     // Denoise (not working)
-    //median_filter(img);
+    median_filter(img);
 
     uint8_t th = otsu_threshold(img);
     fprintf(stdout, "Otsu threshold = %u\n", th);
@@ -232,19 +232,22 @@ void median_filter(SDL_Surface *s) {
             uint8_t new_value;
             int range = max_val - min_val;
             
-            if (range > 5) {
-                if (original == min_val || original == max_val) {
+            int similar_count = 0;
+            for (int i = 0; i < 9; i++) {
+                if (abs((int)values[i] - (int)original) <= 15) {
+                    similar_count++;
+                }
+            }
+            
+            if (range > 20 && similar_count < 3) {
+                int deviation = abs((int)original - (int)median);
+                if (deviation > 40) {
                     new_value = median;
                 } else {
-                    int deviation = abs((int)original - (int)median);
-                    if (deviation > 10) {
-                        new_value = median;  
-                    } else {
-                        new_value = original;  
-                    }
+                    new_value = original;
                 }
             } else {
-                new_value = original;  
+                new_value = original;
             }
             
             uint32_t* dst_row = (uint32_t*)((uint8_t*)s->pixels + y * s->pitch);
