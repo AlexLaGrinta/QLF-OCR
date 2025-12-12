@@ -1,284 +1,176 @@
+#include "solver.h"
+#include <err.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <err.h>
 #include <string.h>
 
+char **get_matrix_of_file(const char *path, size_t *num_lines,
+                          size_t *num_columns) {
+  FILE *fptr;
 
-char** get_matrix_of_file(const char* path, size_t* num_lines, size_t* num_columns)
-{
-    FILE *fptr;
+  fptr = fopen(path, "r");
 
-    fptr = fopen(path, "r");
+  if (fptr == NULL) {
+    errx(EXIT_FAILURE, "file not found.");
+  }
 
-    if (fptr == NULL)
-    {
-        errx(EXIT_FAILURE, "file not found.");
-    }
+  char line[100];
 
-    char line[100];
+  size_t number_of_lines = 1;
+  size_t number_of_columns = 0;
 
-    size_t number_of_lines = 1;
-    size_t number_of_columns = 0;
+  fgets(line, 100, fptr);
 
-    fgets(line, 100, fptr);
+  while (line[number_of_columns] != '\0' && line[number_of_columns] != '\n' &&
+         line[number_of_columns] != ' ') {
+    number_of_columns++;
+  }
 
-    while (line[number_of_columns] != '\0' && line[number_of_columns] != '\n' && line[number_of_columns] != ' ')
-    {
-        number_of_columns++;
-    }
+  while (fgets(line, 100, fptr)) {
+    number_of_lines++;
+  }
 
-    while(fgets(line, 100, fptr)) {
-        number_of_lines++;
-    }
+  rewind(fptr);
 
-    rewind(fptr); 
+  char **grid = malloc(sizeof(char *) * number_of_lines);
 
-    char** grid = malloc(sizeof(char*)*number_of_lines);
+  for (size_t i = 0; i < number_of_lines; i++) {
+    grid[i] = malloc(number_of_columns + 1);
+  }
 
-    for (size_t i = 0; i < number_of_lines; i++)
-    {
-        grid[i] = malloc(number_of_columns+1);
-    }
+  size_t ind = 0;
+  while (fgets(line, 100, fptr)) {
+    memcpy(grid[ind++], line, number_of_columns);
+    grid[ind - 1][number_of_columns] = '\0';
+  }
 
+  fclose(fptr);
 
+  *num_lines = number_of_lines;
+  *num_columns = number_of_columns;
 
-    size_t ind = 0;
-    while(fgets(line, 100, fptr)) {
-        memcpy(grid[ind++], line,number_of_columns);
-        grid[ind-1][number_of_columns] = '\0';
-    }
-
-    fclose(fptr); 
-
-    *num_lines = number_of_lines;
-    *num_columns = number_of_columns;
-
-    return grid;
+  return grid;
 }
 
-void free_grid(char** grid, size_t lines)
-{
-    for (size_t i = 0; i < lines; i++)
-    {
-        free(grid[i]);
-    }
-    free(grid);
+void free_grid_solver(char **grid, size_t lines) {
+  for (size_t i = 0; i < lines; i++) {
+    free(grid[i]);
+  }
+  free(grid);
 }
 
-int search_word(char** grid, const char* word, size_t size_word, 
-    size_t x, size_t y, size_t lines, size_t columns, size_t* end_x, size_t* end_y)
-{
-    //right
-    if (x + size_word <= columns) 
-    {
-        int broke = 0;
-        for (size_t offset = 0; offset < size_word; offset++)
-        {
-            if (grid[y][x+offset] != word[offset]) 
-            {
-                broke = 1;
-                break;
-            }
-        } 
-        if (!broke) 
-        {
-            *end_x = x+size_word-1;
-            *end_y = y;
-            return 1;
-        }
+// Function to check a word in a specific direction with fuzzy matching
+static int check_direction(char **grid, const char *word, size_t size_word,
+                           size_t x, size_t y, int dx, int dy,
+                           int max_mismatches, size_t *end_x, size_t *end_y) {
+  int mismatches = 0;
+  size_t curr_x = x;
+  size_t curr_y = y;
+
+  for (size_t i = 0; i < size_word; i++) {
+    if (grid[curr_y][curr_x] != word[i]) {
+      mismatches++;
+      if (mismatches > max_mismatches) {
+        return 0;
+      }
     }
 
-    // left
-    if (x >= size_word - 1) 
-    {
-        int broke = 0;
-        for (size_t offset = 0; offset < size_word; offset++)
-        {
-            if (grid[y][x-offset] != word[offset]) 
-            {
-                broke = 1;
-                break;
-            }
-        } 
-        if (!broke) 
-        {
-            *end_x = x-size_word+1;
-            *end_y = y;
-            return 1;
-        }
+    if (i < size_word - 1) { // Don't advance for the last character
+      curr_x += dx;
+      curr_y += dy;
     }
+  }
 
-    
-    // low
-    if (y + size_word <= lines) 
-    {
-        int broke = 0;
-        for (size_t offset = 0; offset < size_word; offset++)
-        {
-            if (grid[y+offset][x] != word[offset]) 
-            {
-                
-                broke = 1;
-                break;
-            }
-        } 
-        if (!broke) 
-        {
-            *end_x = x;
-            *end_y = y+size_word-1;
-            return 1;
-        }
-    }
-
-    //high
-    if (y >= size_word - 1) 
-    {
-        int broke = 0;
-        for (size_t offset = 0; offset < size_word; offset++)
-        {
-            if (grid[y-offset][x] != word[offset]) 
-            {
-                broke = 1;
-                break;
-            }
-        } 
-        if (!broke) 
-        {
-            *end_x = x;
-            *end_y = y-size_word+1;
-            return 1;
-        }
-    }
-
-    // bottom right corner
-    if (x + size_word <= columns && y + size_word <= lines) 
-    {
-        int broke = 0;
-        for (size_t offset = 0; offset < size_word; offset++)
-        {
-            if (grid[y+offset][x+offset] != word[offset]) 
-            {
-                broke = 1;
-                break;
-            }
-        } 
-        if (!broke) 
-        {
-            *end_x = x+size_word-1;
-            *end_y = y+size_word-1;
-            return 1;
-        }
-    }
-
-    //top right corner
-    if (x + size_word <= columns && y >= size_word - 1) 
-    {
-        int broke = 0;
-        for (size_t offset = 0; offset < size_word; offset++)
-        {
-            if (grid[y-offset][x+offset] != word[offset]) 
-            {
-                broke = 1;
-                break;
-            }
-        } 
-        if (!broke) 
-        {
-            *end_x = x+size_word-1;
-            *end_y = y-size_word+1;
-            return 1;
-        }
-    }
-
-    //top left corner
-    if (x >= size_word - 1 && y >= size_word - 1) 
-    {
-        int broke = 0;
-        for (size_t offset = 0; offset < size_word; offset++)
-        {
-            if (grid[y-offset][x-offset] != word[offset]) 
-            {
-                broke = 1;
-                break;
-            }
-        } 
-        if (!broke) 
-        {
-            *end_x = x-size_word+1;
-            *end_y = y-size_word+1;
-            return 1;
-        }
-    }
-
-    //bottom left corner
-    if (x >= size_word - 1 && y + size_word  <= lines) 
-    {
-        int broke = 0;
-        for (size_t offset = 0; offset < size_word; offset++)
-        {
-            if (grid[y+offset][x-offset] != word[offset]) 
-            {
-                broke = 1;
-                break;
-            }
-        } 
-        if (!broke) 
-        {
-            *end_x = x-size_word+1;
-            *end_y = y+size_word-1;
-            return 1;
-        }
-    }
-    
-    return 0;
-
+  *end_x = curr_x;
+  *end_y = curr_y;
+  return 1;
 }
 
+int search_word_fuzzy(char **grid, const char *word, size_t size_word, size_t x,
+                      size_t y, size_t lines, size_t columns, size_t *end_x,
+                      size_t *end_y, int max_mismatches) {
+  // Directions: dx, dy
+  // right: 1, 0
+  // left: -1, 0
+  // down: 0, 1
+  // up: 0, -1
+  // down-right: 1, 1
+  // up-right: 1, -1
+  // up-left: -1, -1
+  // down-left: -1, 1
 
-int main(int argc, char* argv[])
-{
-    if (argc < 3)
-    {
-        errx(EXIT_FAILURE, "missing");
+  int directions[8][2] = {{1, 0}, {-1, 0}, {0, 1},   {0, -1},
+                          {1, 1}, {1, -1}, {-1, -1}, {-1, 1}};
+
+  for (int d = 0; d < 8; d++) {
+    int dx = directions[d][0];
+    int dy = directions[d][1];
+
+    // Check if word fits in this direction
+    long long check_end_x = (long long)x + (size_word - 1) * dx;
+    long long check_end_y = (long long)y + (size_word - 1) * dy;
+
+    if (check_end_x >= 0 && check_end_x < (long long)columns &&
+        check_end_y >= 0 && check_end_y < (long long)lines) {
+
+      if (check_direction(grid, word, size_word, x, y, dx, dy, max_mismatches,
+                          end_x, end_y)) {
+        return 1;
+      }
     }
+  }
 
-    const char* path = argv[1];
-    const char* word = argv[2];
-
-    size_t number_of_lines;
-    size_t number_of_columns; 
-
-    char** grid = get_matrix_of_file(path, &number_of_lines, &number_of_columns);
-
-    size_t size_word = strlen(word);
-
-    int res = 0;
-
-    for (size_t y = 0; y < number_of_lines; y++)
-    {
-        char* line = grid[y];
-        for (size_t x = 0; x < number_of_columns; x++)
-        {
-            if (line[x] == word[0])
-            {
-                size_t end_x;
-                size_t end_y;
-                res = search_word(grid, word,size_word,x,y,number_of_lines, 
-                    number_of_columns, &end_x, &end_y);
-                if (res)
-                {
-                    printf("(%li,%li)(%li,%li)\n", x,y,end_x,end_y);
-                    break;
-                }
-            }
-        }
-        if (res) break;
-    }
-
-    if (!res) printf("Not Found\n");
-
-
-    free_grid(grid, number_of_lines);
-
-    return EXIT_SUCCESS;
+  return 0;
 }
+
+#ifndef NO_MAIN_SOLVER
+int main(int argc, char *argv[]) {
+  if (argc < 3) {
+    errx(EXIT_FAILURE, "Usage: ./solver <grid_file> <word> [max_mismatches]");
+  }
+
+  const char *path = argv[1];
+  const char *word = argv[2];
+  int max_mis = 0;
+
+  if (argc >= 4) {
+    max_mis = atoi(argv[3]);
+  }
+
+  size_t number_of_lines;
+  size_t number_of_columns;
+
+  char **grid = get_matrix_of_file(path, &number_of_lines, &number_of_columns);
+
+  size_t size_word = strlen(word);
+
+  int res = 0;
+
+  for (size_t y = 0; y < number_of_lines; y++) {
+    for (size_t x = 0; x < number_of_columns; x++) {
+      // Optimization: check first letter match potentially (skip if strictly no
+      // match and mis=0) But with fuzzy matching, first letter could be wrong.
+      // So we search everywhere. For efficiency, maybe we could still check?
+      // No, we brute force for now.
+
+      size_t end_x;
+      size_t end_y;
+      res = search_word_fuzzy(grid, word, size_word, x, y, number_of_lines,
+                              number_of_columns, &end_x, &end_y, max_mis);
+      if (res) {
+        printf("(%li,%li)(%li,%li)\n", x, y, end_x, end_y);
+        break;
+      }
+    }
+    if (res)
+      break;
+  }
+
+  if (!res)
+    printf("Not Found\n");
+
+  free_grid_solver(grid, number_of_lines);
+
+  return EXIT_SUCCESS;
+}
+#endif

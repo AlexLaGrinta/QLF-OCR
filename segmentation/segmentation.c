@@ -559,7 +559,7 @@ SegmentationResult *perform_segmentation(const char *path) {
 
     // Allouer un tableau temporaire pour les mots (taille max = nombre de
     // lettres)
-    Word2 *temp_words = malloc(list_count * sizeof(Word));
+    Word2 *temp_words = malloc(list_count * sizeof(Word2));
 
     for (int r = 0; r < num_rows; r++) {
       printf("\n  Processing row %d (%d letters at y=%d):\n", r, rows[r].count,
@@ -645,8 +645,8 @@ SegmentationResult *perform_segmentation(const char *path) {
     // Copier les mots dans le résultat final
     result->word_count = word_num;
     if (word_num > 0) {
-      result->words = malloc(word_num * sizeof(Word));
-      memcpy(result->words, temp_words, word_num * sizeof(Word));
+      result->words = malloc(word_num * sizeof(Word2));
+      memcpy(result->words, temp_words, word_num * sizeof(Word2));
     }
     free(temp_words);
 
