@@ -6,6 +6,7 @@
 // Structure pour stocker un chemin de lettre
 typedef struct {
   char path[512];
+  int x, y, width, height;
 } LetterPath;
 
 // Structure pour stocker un mot (liste de chemins de lettres)

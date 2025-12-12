@@ -60,6 +60,7 @@ void free_grid_solver(char **grid, size_t lines) {
 }
 
 // Function to check a word in a specific direction with fuzzy matching
+// Returns mismatch count, or -1 if > max_mismatches
 static int check_direction(char **grid, const char *word, size_t size_word,
                            size_t x, size_t y, int dx, int dy,
                            int max_mismatches, size_t *end_x, size_t *end_y) {
@@ -71,7 +72,7 @@ static int check_direction(char **grid, const char *word, size_t size_word,
     if (grid[curr_y][curr_x] != word[i]) {
       mismatches++;
       if (mismatches > max_mismatches) {
-        return 0;
+        return -1;
       }
     }
 
@@ -83,22 +84,15 @@ static int check_direction(char **grid, const char *word, size_t size_word,
 
   *end_x = curr_x;
   *end_y = curr_y;
-  return 1;
+  return mismatches;
 }
 
 int search_word_fuzzy(char **grid, const char *word, size_t size_word, size_t x,
                       size_t y, size_t lines, size_t columns, size_t *end_x,
                       size_t *end_y, int max_mismatches) {
-  // Directions: dx, dy
-  // right: 1, 0
-  // left: -1, 0
-  // down: 0, 1
-  // up: 0, -1
-  // down-right: 1, 1
-  // up-right: 1, -1
-  // up-left: -1, -1
-  // down-left: -1, 1
-
+  // Keeping this wrapper for backward compatibility if needed,
+  // but effectively it just returns the first valid match.
+  // Directions: dx, dy ...
   int directions[8][2] = {{1, 0}, {-1, 0}, {0, 1},   {0, -1},
                           {1, 1}, {1, -1}, {-1, -1}, {-1, 1}};
 
@@ -114,13 +108,62 @@ int search_word_fuzzy(char **grid, const char *word, size_t size_word, size_t x,
         check_end_y >= 0 && check_end_y < (long long)lines) {
 
       if (check_direction(grid, word, size_word, x, y, dx, dy, max_mismatches,
-                          end_x, end_y)) {
+                          end_x, end_y) != -1) {
         return 1;
       }
     }
   }
 
   return 0;
+}
+
+int find_best_match(char **grid, const char *word, size_t rows, size_t cols,
+                    int max_mismatches, size_t *out_sx, size_t *out_sy,
+                    size_t *out_ex, size_t *out_ey) {
+  int best_mismatches = max_mismatches + 1;
+  int directions[8][2] = {{1, 0}, {-1, 0}, {0, 1},   {0, -1},
+                          {1, 1}, {1, -1}, {-1, -1}, {-1, 1}};
+
+  size_t size_word = strlen(word);
+
+  for (size_t y = 0; y < rows; y++) {
+    for (size_t x = 0; x < cols; x++) {
+
+      for (int d = 0; d < 8; d++) {
+        int dx = directions[d][0];
+        int dy = directions[d][1];
+
+        // Check bounds
+        long long check_end_x = (long long)x + (size_word - 1) * dx;
+        long long check_end_y = (long long)y + (size_word - 1) * dy;
+
+        if (check_end_x >= 0 && check_end_x < (long long)cols &&
+            check_end_y >= 0 && check_end_y < (long long)rows) {
+
+          size_t end_x, end_y;
+          int mis = check_direction(grid, word, size_word, x, y, dx, dy,
+                                    max_mismatches, &end_x, &end_y);
+
+          if (mis != -1 && mis < best_mismatches) {
+            best_mismatches = mis;
+            *out_sx = x;
+            *out_sy = y;
+            *out_ex = end_x;
+            *out_ey = end_y;
+
+            // Optimization: Perfect match found, return immediately
+            if (best_mismatches == 0)
+              return 0;
+          }
+        }
+      }
+    }
+  }
+
+  if (best_mismatches <= max_mismatches) {
+    return best_mismatches;
+  }
+  return -1;
 }
 
 #ifndef NO_MAIN_SOLVER

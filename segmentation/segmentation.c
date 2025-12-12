@@ -420,6 +420,10 @@ SegmentationResult *perform_segmentation(const char *path) {
 
         // Stocker le chemin dans le résultat
         snprintf(result->grid_lines[r].letters[i].path, 512, "%s", filename);
+        result->grid_lines[r].letters[i].x = grid_chars[idx].x;
+        result->grid_lines[r].letters[i].y = grid_chars[idx].y;
+        result->grid_lines[r].letters[i].width = grid_chars[idx].width;
+        result->grid_lines[r].letters[i].height = grid_chars[idx].height;
         letter_counter++;
       }
     }
@@ -628,6 +632,12 @@ SegmentationResult *perform_segmentation(const char *path) {
               // Stocker le chemin dans le résultat
               snprintf(temp_words[word_num].letters[j].path, 512, "%s",
                        filename);
+              temp_words[word_num].letters[j].x = list_chars[letter_idx].x;
+              temp_words[word_num].letters[j].y = list_chars[letter_idx].y;
+              temp_words[word_num].letters[j].width =
+                  list_chars[letter_idx].width;
+              temp_words[word_num].letters[j].height =
+                  list_chars[letter_idx].height;
             }
 
             printf("    Word %d: %d letters at position (%d, %d), width=%d -> "
