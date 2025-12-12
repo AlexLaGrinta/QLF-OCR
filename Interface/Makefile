@@ -1,9 +1,9 @@
 # === Variables ===
 CC = gcc
-CFLAGS = -Wall -Wextra -O2 `pkg-config --cflags gtk+-3.0`
-LIBS = `pkg-config --libs gtk+-3.0` -lm
+CFLAGS = -Wall -Wextra -O2 `pkg-config --cflags gtk+-3.0 sdl2 SDL2_image`
+LIBS = `pkg-config --libs gtk+-3.0 sdl2 SDL2_image` -lm
 TARGET = interface
-SRC = interface.c
+SRC = interface.c ../Preprocessing/preprocessing.c ../RotationPNG/rotate_png.c
 OBJ = $(SRC:.c=.o)
 
 # === Règle par défaut ===
