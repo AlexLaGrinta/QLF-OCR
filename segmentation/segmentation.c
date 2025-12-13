@@ -3,6 +3,7 @@
 #include "image_segmentation.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -157,28 +158,6 @@ static float calculate_avg_letter_height(Character *chars, int count) {
   return total / count;
 }
 
-static bool are_letters_in_same_word(Character *c1, Character *c2,
-                                     float avg_width, float avg_height) {
-  // Calculer la distance horizontale entre les deux lettres
-  int horizontal_gap = c2->x - (c1->x + c1->width);
-
-  // Calculer la différence verticale (alignement)
-  int vertical_diff = abs(c1->y - c2->y);
-
-  // Critères pour appartenir au même mot :
-  // 1. Alignement vertical : différence < 30% de la hauteur moyenne
-  // 2. Proximité horizontale : gap < 150% de la largeur moyenne
-
-  float max_vertical_diff = avg_height * 0.3f;
-  float max_horizontal_gap = avg_width * 1.5f;
-
-  bool vertically_aligned = (vertical_diff < max_vertical_diff);
-  bool horizontally_close =
-      (horizontal_gap >= -5 && horizontal_gap < max_horizontal_gap);
-
-  return vertically_aligned && horizontally_close;
-}
-
 SegmentationResult *perform_segmentation(const char *path) {
   SegmentationResult *result = create_segmentation_result();
   if (!result) {
@@ -229,8 +208,7 @@ SegmentationResult *perform_segmentation(const char *path) {
   GridBounds grid_bounds = {0};
   GridBounds list_bounds = {0};
 
-  int zones_detected =
-      detect_major_zones_improved(bin, &grid_bounds, &list_bounds);
+  detect_major_zones_improved(bin, &grid_bounds, &list_bounds);
 
   if (!grid_bounds.valid) {
     fprintf(stderr, "✗ Grid detection failed\n");
