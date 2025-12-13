@@ -602,7 +602,7 @@ int detect_major_zones_improved(BinaryImage *bin, GridBounds *grid_bounds,
       // Enforce BOTH good regularity AND sufficient size (e.g. at least 60
       // chars ~ 8x8 grid) This prevents a small perfect wordlist (40-50 chars)
       // from beating a larger fragmented grid.
-      if (pass_best_reg > 0.40f && pass_best_count > 60) {
+      if (pass_best_reg > 0.40f && pass_best_count > 120) {
         // Found a decent AND large grid, stop here
         best_cluster = pass_best_cluster;
         best_regularity = pass_best_reg;
@@ -915,8 +915,29 @@ int detect_major_zones_improved(BinaryImage *bin, GridBounds *grid_bounds,
 
         if (!comps->components[i].is_grid &&
             !comps->components[i].is_wordlist) {
-          // Check position: below grid
+
+          // c->min_y);
+
+          bool should_include = false;
+
+          // CHECK 1: BELOW GRID
           if (c->min_y > grid_bottom + bottom_margin) {
+            should_include = true;
+          }
+
+          // CHECK 2: RIGHT OF GRID
+          // Ensure it's significantly to the right (margin) and within
+          // reasonable vertical bounds of grid (or slightly below)
+          if (grid_bounds->valid) {
+            int grid_right = grid_bounds->x + grid_bounds->width;
+            int right_margin = 20;
+
+            if (c->min_x > grid_right + right_margin) {
+              should_include = true;
+            }
+          }
+
+          if (should_include) {
             // Check size: significant enough to be text
             int c_width = c->max_x - c->min_x;
             int c_height = c->max_y - c->min_y;
@@ -1018,9 +1039,10 @@ int detect_major_zones_improved(BinaryImage *bin, GridBounds *grid_bounds,
                 else if (c2->min_y > c1->max_y)
                   dist_y = c2->min_y - c1->max_y;
 
-                // Threshold: Relaxed Horizontal (500) to bridge columns.
-                // Strict Vertical (150) to separate title.
-                if (dist_x < 500 && dist_y < 150) {
+                // Threshold: Reduced to prevent merging disjoint clusters
+                // (Right vs Below) Was 500/150. Now 200/100 to require tighter
+                // grouping.
+                if (dist_x < 200 && dist_y < 100) {
                   meta_labels[j] = current_meta_id;
                   queue[tail++] = j;
                   current_letters++;
@@ -1084,6 +1106,29 @@ int detect_major_zones_improved(BinaryImage *bin, GridBounds *grid_bounds,
           list_bounds->width = max_x - min_x + 20;
           list_bounds->height = max_y - min_y + 20;
           list_bounds->valid = true;
+
+          // FINAL SAFETY CHECK: Does the specific WordList BOX overlap the Grid
+          // BOX? If so, it's likely a bad merge (diagonal) or error.
+          if (grid_bounds->valid) {
+            int intersect_x = fmax(grid_bounds->x, list_bounds->x);
+            int intersect_y = fmax(grid_bounds->y, list_bounds->y);
+            int intersect_r = fmin(grid_bounds->x + grid_bounds->width,
+                                   list_bounds->x + list_bounds->width);
+            int intersect_b = fmin(grid_bounds->y + grid_bounds->height,
+                                   list_bounds->y + list_bounds->height);
+
+            if (intersect_r > intersect_x && intersect_b > intersect_y) {
+              printf("     ⚠️ WordList Box overlaps Grid Box! (Intersection: "
+                     "w=%d, h=%d)\n",
+                     intersect_r - intersect_x, intersect_b - intersect_y);
+
+              // Heuristic: If overlap is significant (> 10%), invalidate.
+              // Actually, let's just invalidate to be safe as per user request.
+              printf("     ✗ Invalidating WordList due to overlap.\n");
+              list_bounds->valid = false;
+            }
+          }
+
         } else {
           printf("     ✗ All wordlist candidates filtered (overlap/noise)\n");
           list_bounds->valid = false;

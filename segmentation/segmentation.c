@@ -247,6 +247,7 @@ SegmentationResult *perform_segmentation(const char *path) {
   // STEP 5: FILTERING (optionnel)
   // ========================================================================
 
+  chars = split_merged_characters(chars, &num_chars);
   chars = filter_letters(chars, &num_chars);
 
   // ========================================================================

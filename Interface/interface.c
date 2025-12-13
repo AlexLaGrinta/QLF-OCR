@@ -132,6 +132,7 @@ static void apply_dark_theme(GtkWidget *window) {
 }
 
 static void on_open_clicked(GtkWidget *widget, gpointer data) {
+  system("rm -rf ../output");
   AppWidgets *app = data;
   GtkWidget *dialog = gtk_file_chooser_dialog_new(
       "Choisir une image", GTK_WINDOW(app->window),
