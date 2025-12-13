@@ -247,6 +247,159 @@ void assign_character_zones(Character *chars, int num_chars,
 }
 
 // ============================================================================
+// SPLITTING MERGED CHARACTERS
+// ============================================================================
+
+Character *split_merged_characters(Character *chars, int *num_chars) {
+  if (!chars || *num_chars == 0)
+    return chars;
+
+  printf("\n✂️ Checking for merged characters...\n");
+
+  // 1. Calculate average width (separately for GRID and WORDLIST if possible,
+  // but global is safer for now) Actually, GRID letters are usually uniform.
+  // WORDLIST might be variable. Let's compute average width for the ZONE_GRID
+  // and ZONE_WORDLIST separately.
+
+  float grid_total_width = 0;
+  int grid_count = 0;
+  float list_total_width = 0;
+  int list_count = 0;
+
+  for (int i = 0; i < *num_chars; i++) {
+    if (chars[i].zone == ZONE_GRID) {
+      grid_total_width += chars[i].width;
+      grid_count++;
+    } else if (chars[i].zone == ZONE_WORDLIST) {
+      list_total_width += chars[i].width;
+      list_count++;
+    }
+  }
+
+  float grid_avg_w = (grid_count > 0) ? grid_total_width / grid_count : 0;
+  float list_avg_w = (list_count > 0) ? list_total_width / list_count : 0;
+
+  printf("  Stats: Grid avg width=%.1f, Wordlist avg width=%.1f\n", grid_avg_w,
+         list_avg_w);
+
+  // Temp array for new list
+  // Worst case: every char splits into 2.
+  int capacity = (*num_chars) * 2 + 100;
+  Character *new_chars = malloc(capacity * sizeof(Character));
+  int new_count = 0;
+
+  int split_count = 0;
+
+  for (int i = 0; i < *num_chars; i++) {
+    Character ch = chars[i];
+    bool did_split = false;
+
+    float avg_w = (ch.zone == ZONE_GRID) ? grid_avg_w : list_avg_w;
+
+    // If no average (empty zone), use the other one or fallback
+    if (avg_w == 0)
+      avg_w = (grid_avg_w > 0) ? grid_avg_w : list_avg_w;
+
+    // Threshold: 1.8x average width seems reasonable for 2 merged letters
+    // Also ensure it's not just a wide empty box (density check?) -> Let's
+    // stick to width first as requested. User said: "si tu trouves une lettre
+    // qui est trop grand essaye de la diviser en deux"
+
+    if (avg_w > 0 && ch.width > 3.0 * avg_w &&
+        ch.width >
+            20) { // arbitrary absolute min width to avoid splitting tiny noise
+      // Try to find a split point
+      // Look in the middle 50%
+      int start_search = ch.width * 0.25;
+      int end_search = ch.width * 0.75;
+
+      int best_split_x = -1;
+      int min_black_pixels = INT_MAX;
+
+      // Find vertical line with minimum black pixels (cuts through whitespace
+      // or thinnest part)
+      for (int x = start_search; x <= end_search; x++) {
+        int black_count = 0;
+        for (int y = 0; y < ch.height; y++) {
+          if (ch.data[y * ch.width + x] < 128) {
+            black_count++;
+          }
+        }
+
+        if (black_count < min_black_pixels) {
+          min_black_pixels = black_count;
+          best_split_x = x;
+        }
+      }
+
+      // Only split if we found a reasonable cut
+      // Maybe ensure we don't cut through too much "meat" (unless it's a
+      // ligature) For now, blindly cut at best point.
+
+      if (best_split_x != -1) {
+        printf("  Splitting char at index %d (w=%d, avg=%.1f) at x=%d\n", i,
+               ch.width, avg_w, best_split_x);
+
+        // Create Left Part
+        Character left;
+        left.x = ch.x;
+        left.y = ch.y;
+        left.width = best_split_x;
+        left.height = ch.height;
+        left.zone = ch.zone;
+        left.data = malloc(left.width * left.height);
+
+        for (int y = 0; y < left.height; y++) {
+          // Copy row segment
+          memcpy(left.data + y * left.width, ch.data + y * ch.width,
+                 left.width);
+        }
+
+        // Create Right Part
+        Character right;
+        right.x = ch.x + best_split_x;
+        right.y = ch.y;
+        right.width = ch.width - best_split_x;
+        right.height = ch.height;
+        right.zone = ch.zone;
+        right.data = malloc(right.width * right.height);
+
+        for (int y = 0; y < right.height; y++) {
+          // Copy row segment
+          memcpy(right.data + y * right.width,
+                 ch.data + y * ch.width + best_split_x, right.width);
+        }
+
+        new_chars[new_count++] = left;
+        new_chars[new_count++] = right;
+        split_count++;
+        did_split = true;
+
+        // Free original data (we made copies)
+        free(ch.data);
+      }
+    }
+
+    if (!did_split) {
+      new_chars[new_count++] = ch;
+    }
+  }
+
+  printf("  Split %d characters. New total: %d\n", split_count, new_count);
+
+  // Free old array (shallow free shell, deep free was handled if split,
+  // otherwise ownership transferred) Wait, if I didn't split, new_chars has the
+  // original pointers? No, Character is a struct, so it copied the struct. The
+  // struct contains `uint8_t* data`. If I split: I freed `ch.data` and malloced
+  // new data for left/right. If I didn't split: `new_chars` has copy of pointer
+  // to same data. So I just need to free the old `chars` array shell.
+  free(chars);
+
+  *num_chars = new_count;
+  return new_chars;
+}
+
+// ============================================================================
 // FILTRAGE DES LETTRES - DOUBLE STRATÉGIE SELON LA ZONE
 // ============================================================================
 
