@@ -575,87 +575,179 @@ int detect_major_zones_improved(BinaryImage *bin, GridBounds *grid_bounds,
     // 4. Analyze Clusters
     int pass_best_cluster = -1;
     float pass_best_reg = 0;
+    int pass_best_count = 0;
 
     for (int c = 0; c < num_clusters; c++) {
       float regularity = analyze_grid_structure(comps, c);
 
-      if (regularity > pass_best_reg) {
-        pass_best_reg = regularity;
-        pass_best_cluster = c;
+      // Count letters in this cluster
+      int count = 0;
+      for (int i = 0; i < comps->count; i++)
+        if (comps->components[i].cluster_id == c)
+          count++;
+
+      // Selection Logic: Prioritize Size if Regularity is decent (> 0.25)
+      // Otherwise, keep looking.
+      if (regularity > 0.25f) {
+        if (count > pass_best_count) {
+          pass_best_count = count;
+          pass_best_cluster = c;
+          pass_best_reg = regularity;
+        }
       }
     }
 
     // Decision
     if (pass == 0) {
-      if (pass_best_reg > 0.6f) {
-        // Found a great grid, stop here
+      // Enforce BOTH good regularity AND sufficient size (e.g. at least 60
+      // chars ~ 8x8 grid) This prevents a small perfect wordlist (40-50 chars)
+      // from beating a larger fragmented grid.
+      if (pass_best_reg > 0.40f && pass_best_count > 60) {
+        // Found a decent AND large grid, stop here
         best_cluster = pass_best_cluster;
         best_regularity = pass_best_reg;
-        printf("    ✓ High quality grid found significantly (Reg=%.2f). "
-               "Stopping.\n",
-               pass_best_reg);
+        printf("    ✓ High quality grid found significantly (Reg=%.2f, "
+               "Count=%d). Stopping.\n",
+               pass_best_reg, pass_best_count);
         break;
       } else {
-        printf("    ✗ No high quality grid in Pass 0 (Best=%.2f). Trying "
-               "relaxed pass.\n",
-               pass_best_reg);
+        printf("    ✗ Pass 0 rejected (Best Reg=%.2f, Best Size=%d). Need "
+               "better candidate. Trying relaxed pass.\n",
+               pass_best_reg, pass_best_count);
       }
     } else {
-      // Pass 1: Take whatever is best if valid
-      if (pass_best_reg > 0.3f) { // 0.3 matches the lowered threshold
-        best_cluster = pass_best_cluster;
-        best_regularity = pass_best_reg;
-      }
+      best_cluster = pass_best_cluster;
+      best_regularity = pass_best_reg;
     }
-  }
+  } // End of pass loop
 
   free(all_indices);
 
-  // Re-run analyze to get bounds? No, we need to extract it now.
-  // Actually, wait. We need the cluster IDs to be set to the *winning* pass
-  // state. If use Pass 0, comps are set. If failed Pass 0, comps are
-  // overwritten by Pass 1. So the loop structure works naturally: comps will
-  // have Pass 1 IDs if we run Pass 1. BUT: if we break from Pass 0, comps has
-  // Pass 0 IDs. Perfect.
-
+  // --- POST-PROCESSING: RECURSIVE SPLIT MERGED CLUSTERS ---
   if (best_cluster != -1) {
-    // Recalculate component list for bounds (logic below expects best_cluster
-    // to exist) We just need to ensure `best_cluster` index matches the current
-    // `comps` state. Since `dbscan_cluster` resets numbering from 0 each run,
-    // `c` indices match.
-  }
+    bool split_occurred = true;
+    int safety_loop = 0;
 
-  // Resume original logic...
-  // Just need to ensure the variables below map correctly.
+    while (split_occurred && safety_loop < 3) { // Limit recursions
+      split_occurred = false;
+      safety_loop++;
 
-  if (best_cluster >= 0) {
-    // Logic to extract bounds... using best_cluster ID
-    // ... (Original logic continues)
+      // 1. Collect Stats for CURRENT best_cluster
+      int min_x = 99999, max_x = 0;
+      int count = 0;
+      for (int i = 0; i < comps->count; i++) {
+        if (comps->components[i].cluster_id == best_cluster) {
+          int x = comps->components[i].min_x;
+          if (x < min_x)
+            min_x = x;
+          if (comps->components[i].max_x > max_x)
+            max_x = comps->components[i].max_x;
+          count++;
+        }
+      }
 
-    // We need to re-extract the components because previous code did it inside
-    // loop? No, previous code did NOT extract bounds inside the search loop. It
-    // did:
-    /*
-    for (int c = 0; c < num_clusters; c++) {
-       if (reg > best) {
-           best_cluster = c;
-           // calculate best_rows (removed)
-           // allocate cluster_comps (freed)
-       }
+      // Need significant size to split
+      if (count > 20 && (max_x - min_x) > 100) {
+        // Calculate Median Width
+        int *widths = malloc(count * sizeof(int));
+        int w_idx = 0;
+        for (int i = 0; i < comps->count; i++) {
+          if (comps->components[i].cluster_id == best_cluster) {
+            widths[w_idx++] =
+                comps->components[i].max_x - comps->components[i].min_x;
+          }
+        }
+        // Simple median
+        for (int i = 0; i < count - 1; i++) {
+          for (int j = i + 1; j < count; j++) {
+            if (widths[i] > widths[j]) {
+              int tmp = widths[i];
+              widths[i] = widths[j];
+              widths[j] = tmp;
+            }
+          }
+        }
+        int median_width = (count > 0) ? widths[count / 2] : 20;
+        free(widths);
+
+        // Relaxed Threshold: Require a VERY clear gap to split.
+        // 4.0 * 20px = 80px. Min 100px.
+        // This prevents splitting the grid if a column is missing (gap ~70px).
+        int gap_threshold = (int)(median_width * 4.0);
+        if (gap_threshold < 100)
+          gap_threshold = 100;
+
+        // Build Histogram
+        int width = max_x - min_x;
+        int *histo = calloc(width + 1, sizeof(int));
+        for (int i = 0; i < comps->count; i++) {
+          if (comps->components[i].cluster_id == best_cluster) {
+            int cx =
+                (comps->components[i].min_x + comps->components[i].max_x) / 2;
+            if (cx >= min_x && cx <= max_x)
+              histo[cx - min_x]++;
+          }
+        }
+
+        // Scan for gap
+        int max_gap = 0;
+        int current_gap = 0;
+        int best_split_x = -1;
+
+        for (int x = 0; x <= width; x++) {
+          // Relaxed check: Allow <= 1 pixel density to be part of "gap"
+          // (skipping noise)
+          if (histo[x] <= 1) {
+            current_gap++;
+          } else {
+            if (current_gap > gap_threshold && current_gap > max_gap) {
+              max_gap = current_gap;
+              best_split_x = min_x + x - current_gap / 2;
+            }
+            current_gap = 0;
+          }
+        }
+        free(histo);
+
+        if (best_split_x != -1) {
+          printf("    ⚠️  Splitter: Found Gap=%d at x=%d. Splitting...\n",
+                 max_gap, best_split_x);
+          int new_cluster_id = num_clusters + safety_loop; // Unique ID
+
+          // Apply Split
+          int count_left = 0;
+          int count_right = 0;
+          for (int i = 0; i < comps->count; i++) {
+            if (comps->components[i].cluster_id == best_cluster) {
+              if (comps->components[i].min_x > best_split_x) {
+                comps->components[i].cluster_id = new_cluster_id;
+                count_right++;
+              } else {
+                count_left++;
+              }
+            }
+          }
+
+          printf("    -> Split Result: Left=%d, Right=%d\n", count_left,
+                 count_right);
+
+          // Re-Evaluate: Keep the larger chunk as 'best_cluster'
+          if (count_right > count_left) {
+            printf("    -> Switching focus to Right Cluster (larger)\n");
+            best_cluster = new_cluster_id;
+            // Loop will continue and check this new cluster for further splits
+          } else {
+            printf("    -> Keeping focus on Left Cluster (larger)\n");
+            // Loop will continue and check left cluster
+          }
+          split_occurred = true;
+        }
+      }
     }
-    if (best_cluster >= 0) { extract bounds }
-    */
-
-    // So my structure determines best_cluster.
-    // Logic below loop extracts bounds.
-    // Correct.
-  }
-
-  int grid_count = 0;
-  if (best_cluster >= 0) {
-
-    int min_x = INT_MAX, max_x = 0;
-    int min_y = INT_MAX, max_y = 0;
+    // --- CALCULATE GRID BOUNDS ---
+    int final_min_x = 99999, final_max_x = 0;
+    int final_min_y = 99999, final_max_y = 0;
+    int grid_count = 0;
 
     for (int i = 0; i < comps->count; i++) {
       if (comps->components[i].cluster_id == best_cluster) {
@@ -663,23 +755,26 @@ int detect_major_zones_improved(BinaryImage *bin, GridBounds *grid_bounds,
         grid_count++;
 
         Component *c = &comps->components[i];
-        if (c->min_x < min_x)
-          min_x = c->min_x;
-        if (c->max_x > max_x)
-          max_x = c->max_x;
-        if (c->min_y < min_y)
-          min_y = c->min_y;
-        if (c->max_y > max_y)
-          max_y = c->max_y;
+        if (c->min_x < final_min_x)
+          final_min_x = c->min_x;
+        if (c->max_x > final_max_x)
+          final_max_x = c->max_x;
+        if (c->min_y < final_min_y)
+          final_min_y = c->min_y;
+        if (c->max_y > final_max_y)
+          final_max_y = c->max_y;
       }
     }
 
-    grid_bounds->x = min_x - 10;
-    grid_bounds->y = min_y - 10;
-    grid_bounds->width = max_x - min_x + 20;
-    grid_bounds->height = max_y - min_y + 20;
-    grid_bounds->valid = true;
-
+    if (grid_count > 0) {
+      grid_bounds->x = final_min_x - 10;
+      grid_bounds->y = final_min_y - 10;
+      grid_bounds->width = final_max_x - final_min_x + 20;
+      grid_bounds->height = final_max_y - final_min_y + 20;
+      grid_bounds->valid = true;
+    } else {
+      grid_bounds->valid = false;
+    }
   } else {
     printf("\n  ✗ No grid structure detected\n");
     grid_bounds->valid = false;
@@ -787,8 +882,8 @@ int detect_major_zones_improved(BinaryImage *bin, GridBounds *grid_bounds,
       int min_x = INT_MAX, max_x = 0;
       int min_y = INT_MAX, max_y = 0;
 
-      // Threshold: Keep clusters that are substantial relative to the main one,
-      // or just absolute size > 5 to catch separated words
+      // Threshold: Keep clusters that are substantial relative to the main
+      // one, or just absolute size > 5 to catch separated words
       int threshold = 5;
       if (max_letters < 10)
         threshold = 3;
@@ -804,8 +899,8 @@ int detect_major_zones_improved(BinaryImage *bin, GridBounds *grid_bounds,
              "components below y=%d\n",
              grid_bottom, comps->count > 0 ? 0 : 0,
              grid_bottom + bottom_margin);
-      // Oops, I can't access bin->height here easily unless I pass it or infer
-      // it. But I can guess max detected y?
+      // Oops, I can't access bin->height here easily unless I pass it or
+      // infer it. But I can guess max detected y?
       int max_detected_y = 0;
       for (int i = 0; i < comps->count; i++)
         if (comps->components[i].max_y > max_detected_y)
@@ -878,7 +973,8 @@ int detect_major_zones_improved(BinaryImage *bin, GridBounds *grid_bounds,
       // STEP 3: META-CLUSTERING & DISTINCT ZONE SELECTION
       // ============================================================================
       // Group all 'is_wordlist' components into spatially distinct
-      // Meta-Clusters. Choose the LARGEST Meta-Cluster and discard the rest.
+      // Meta-Clusters. Choose the LARGEST Meta-Cluster and discard the
+      // rest.
 
       int *meta_labels = malloc(comps->count * sizeof(int));
       for (int i = 0; i < comps->count; i++)
@@ -894,7 +990,8 @@ int detect_major_zones_improved(BinaryImage *bin, GridBounds *grid_bounds,
           int current_meta_id = meta_cluster_count++;
           meta_labels[i] = current_meta_id;
 
-          // BFS to find all connected components (using permissive distance)
+          // BFS to find all connected components (using permissive
+          // distance)
           int current_letters = 1;
           int *queue = malloc(comps->count * sizeof(int));
           int head = 0, tail = 0;
@@ -921,8 +1018,8 @@ int detect_major_zones_improved(BinaryImage *bin, GridBounds *grid_bounds,
                 else if (c2->min_y > c1->max_y)
                   dist_y = c2->min_y - c1->max_y;
 
-                // Threshold: Relaxed Horizontal (500) to bridge columns. Strict
-                // Vertical (150) to separate title.
+                // Threshold: Relaxed Horizontal (500) to bridge columns.
+                // Strict Vertical (150) to separate title.
                 if (dist_x < 500 && dist_y < 150) {
                   meta_labels[j] = current_meta_id;
                   queue[tail++] = j;
@@ -941,7 +1038,8 @@ int detect_major_zones_improved(BinaryImage *bin, GridBounds *grid_bounds,
         }
       }
 
-      // APPLY SELECTION: Keep only the best Meta-Cluster and calculate bounds
+      // APPLY SELECTION: Keep only the best Meta-Cluster and calculate
+      // bounds
       if (best_meta_id != -1) {
         int min_x = INT_MAX, max_x = 0;
         int min_y = INT_MAX, max_y = 0;
