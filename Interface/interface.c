@@ -34,22 +34,20 @@ int main(int argc, char *argv[]) {
   GtkWidget *hbox_top = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
   gtk_box_pack_start(GTK_BOX(vbox), hbox_top, FALSE, FALSE, 0);
 
-  GtkWidget *btn_open = gtk_button_new_with_label("Ouvrir une image PNG");
+  GtkWidget *btn_open = gtk_button_new_with_label("Ouvrir une image");
   GtkWidget *btn_ocr = gtk_button_new_with_label("OCR");
   GtkWidget *btn_save = gtk_button_new_with_label("Sauvegarder");
-  // GtkWidget *btn_fullscreen = gtk_button_new_with_label("Plein écran");
+
 
   gtk_box_pack_start(GTK_BOX(hbox_top), btn_open, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(hbox_top), btn_ocr, FALSE, FALSE, 0);
 
-  // Median Filter Checkbox
   GtkWidget *chk_median = gtk_check_button_new_with_label("Filtre Médian");
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(chk_median),
-                               TRUE); // Default ON
+                               TRUE); 
   gtk_box_pack_start(GTK_BOX(hbox_top), chk_median, FALSE, FALSE, 0);
 
   gtk_box_pack_start(GTK_BOX(hbox_top), btn_save, FALSE, FALSE, 0);
-  // gtk_box_pack_end(GTK_BOX(hbox_top), btn_fullscreen, FALSE, FALSE, 0);
 
   GtkWidget *image_preview = gtk_image_new();
   gtk_widget_set_halign(image_preview, GTK_ALIGN_CENTER);
@@ -68,8 +66,6 @@ int main(int argc, char *argv[]) {
   g_signal_connect(btn_open, "clicked", G_CALLBACK(on_open_clicked), app);
   g_signal_connect(btn_save, "clicked", G_CALLBACK(on_save_clicked), app);
   g_signal_connect(btn_ocr, "clicked", G_CALLBACK(on_ocr_clicked), app);
-  // g_signal_connect(btn_fullscreen, "clicked",
-  // G_CALLBACK(on_fullscreen_toggle),app);
 
   gtk_widget_show_all(window);
   gtk_main();
@@ -81,38 +77,7 @@ int main(int argc, char *argv[]) {
   g_free(app);
   return 0;
 }
-/*
-static void on_fullscreen_toggle(GtkWidget *widget, gpointer data) {
-  AppWidgets *app = data;
-  static gboolean full = FALSE;
 
-  if (!app->pixbuf_display)
-    return;
-
-  if (!full) {
-    gtk_window_fullscreen(GTK_WINDOW(app->window));
-    gtk_button_set_label(GTK_BUTTON(widget), "Quitter plein écran");
-  } else {
-    gtk_window_unfullscreen(GTK_WINDOW(app->window));
-    gtk_button_set_label(GTK_BUTTON(widget), "Plein écran");
-  }
-
-  full = !full;
-
-  int win_width, win_height;
-  gtk_window_get_size(GTK_WINDOW(app->window), &win_width, &win_height);
-
-  if (app->pixbuf_display && app->pixbuf_original) {
-    g_object_unref(app->pixbuf_display);
-    GdkPixbuf *scaled =
-        gdk_pixbuf_scale_simple(app->pixbuf_original, win_width - 40,
-                                win_height - 80, GDK_INTERP_BILINEAR);
-    app->pixbuf_display = scaled;
-    gtk_image_set_from_pixbuf(GTK_IMAGE(app->image_preview),
-                              app->pixbuf_display);
-  }
-}
-*/
 static void apply_dark_theme(GtkWidget *window) {
   GtkCssProvider *provider = gtk_css_provider_new();
   gtk_css_provider_load_from_data(
@@ -232,11 +197,8 @@ static void on_ocr_clicked(GtkWidget *widget, gpointer data) {
 
   if (ret != 0) {
     g_print("Error executing OCR solver (code %d).\n", ret);
-    // Could show a dialog here
     return;
   }
-
-  // Result should be in "../output/solved.bmp"
   const char *result_path = "../output/solved.bmp";
 
   if (app->pixbuf_display)

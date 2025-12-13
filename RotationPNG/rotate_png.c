@@ -46,7 +46,6 @@ GdkPixbuf *rotate_pixbuf_bilinear_fixed(const GdkPixbuf *src,
   return dst;
 }
 
-// Helper to compute Otsu's threshold for a GdkPixbuf
 static int otsu_threshold_pixbuf(const GdkPixbuf *src) {
   int w = gdk_pixbuf_get_width(src);
   int h = gdk_pixbuf_get_height(src);
@@ -54,12 +53,10 @@ static int otsu_threshold_pixbuf(const GdkPixbuf *src) {
   int n = gdk_pixbuf_get_n_channels(src);
   const guchar *pixels = gdk_pixbuf_get_pixels(src);
 
-  // Calculate histogram
   int hist[256];
   memset(hist, 0, sizeof(hist));
   int total_pixels = 0;
 
-  // Scan efficient sample (step=4) to save time, or full image
   int step = 4;
   for (int y = 0; y < h; y += step) {
     for (int x = 0; x < w; x += step) {
@@ -70,7 +67,6 @@ static int otsu_threshold_pixbuf(const GdkPixbuf *src) {
     }
   }
 
-  // Otsu's algorithm
   float sum = 0;
   for (int i = 0; i < 256; i++)
     sum += i * hist[i];
@@ -79,7 +75,7 @@ static int otsu_threshold_pixbuf(const GdkPixbuf *src) {
   int wB = 0;
   int wF = 0;
   float varMax = 0;
-  int threshold = 128; // fallback
+  int threshold = 128; 
 
   for (int t = 0; t < 256; t++) {
     wB += hist[t];
@@ -110,7 +106,6 @@ double detect_skew_angle(const GdkPixbuf *src) {
   const guchar *p = gdk_pixbuf_get_pixels(src);
 
   int threshold = otsu_threshold_pixbuf(src);
-  // printf("Rotation Otsu Threshold detected: %d\n", threshold);
 
   double best_angle = 0.0;
   double best_score = -1.0;
