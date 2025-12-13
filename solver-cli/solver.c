@@ -59,8 +59,6 @@ void free_grid_solver(char **grid, size_t lines) {
   free(grid);
 }
 
-// Function to check a word in a specific direction with fuzzy matching
-// Returns mismatch count, or -1 if > max_mismatches
 static int check_direction(char **grid, const char *word, size_t size_word,
                            size_t x, size_t y, int dx, int dy,
                            int max_mismatches, size_t *end_x, size_t *end_y) {
@@ -76,7 +74,7 @@ static int check_direction(char **grid, const char *word, size_t size_word,
       }
     }
 
-    if (i < size_word - 1) { // Don't advance for the last character
+    if (i < size_word - 1) { 
       curr_x += dx;
       curr_y += dy;
     }
@@ -90,9 +88,7 @@ static int check_direction(char **grid, const char *word, size_t size_word,
 int search_word_fuzzy(char **grid, const char *word, size_t size_word, size_t x,
                       size_t y, size_t lines, size_t columns, size_t *end_x,
                       size_t *end_y, int max_mismatches) {
-  // Keeping this wrapper for backward compatibility if needed,
-  // but effectively it just returns the first valid match.
-  // Directions: dx, dy ...
+
   int directions[8][2] = {{1, 0}, {-1, 0}, {0, 1},   {0, -1},
                           {1, 1}, {1, -1}, {-1, -1}, {-1, 1}};
 
@@ -100,7 +96,6 @@ int search_word_fuzzy(char **grid, const char *word, size_t size_word, size_t x,
     int dx = directions[d][0];
     int dy = directions[d][1];
 
-    // Check if word fits in this direction
     long long check_end_x = (long long)x + (size_word - 1) * dx;
     long long check_end_y = (long long)y + (size_word - 1) * dy;
 
@@ -133,7 +128,6 @@ int find_best_match(char **grid, const char *word, size_t rows, size_t cols,
         int dx = directions[d][0];
         int dy = directions[d][1];
 
-        // Check bounds
         long long check_end_x = (long long)x + (size_word - 1) * dx;
         long long check_end_y = (long long)y + (size_word - 1) * dy;
 
@@ -151,7 +145,6 @@ int find_best_match(char **grid, const char *word, size_t rows, size_t cols,
             *out_ex = end_x;
             *out_ey = end_y;
 
-            // Optimization: Perfect match found, return immediately
             if (best_mismatches == 0)
               return 0;
           }
@@ -191,10 +184,6 @@ int main(int argc, char *argv[]) {
 
   for (size_t y = 0; y < number_of_lines; y++) {
     for (size_t x = 0; x < number_of_columns; x++) {
-      // Optimization: check first letter match potentially (skip if strictly no
-      // match and mis=0) But with fuzzy matching, first letter could be wrong.
-      // So we search everywhere. For efficiency, maybe we could still check?
-      // No, we brute force for now.
 
       size_t end_x;
       size_t end_y;

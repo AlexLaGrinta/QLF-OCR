@@ -3,16 +3,12 @@
 
 #include <stddef.h>
 
-// Architecture parameters
 #define INPUT_SIZE 784
 #define HIDDEN_SIZE_1 128
 #define HIDDEN_SIZE_2 128
 #define OUTPUT_SIZE 26
 
-// Hyperparameters
-#define EPOCHS                                                                 \
-  50 // Momentum speeds up convergence, we can reduce epochs slightly or keep
-     // same
+#define EPOCHS 50 
 #define INITIAL_LEARNING_RATE 0.001
 #define DECAY_RATE 0.001
 #define LAMBDA 0.0
@@ -44,21 +40,17 @@ typedef struct {
   int expected_value;
 } SampleData;
 
-// --- Core Functions ---
 void initialize_network(NeuralNetwork *network);
 void train_network(NeuralNetwork *network, SampleData **dataset,
                    size_t dataset_size);
 int predict(NeuralNetwork *network, double *inputs);
 
-// --- Activation Functions ---
 double relu(double x);
-double d_relu(double y); // Derivative of ReLU
+double d_relu(double y); 
 
-// --- Persistence ---
 void save_network_weights(NeuralNetwork *network, const char *path);
 void load_network_weights(NeuralNetwork *network, const char *path);
 
-// --- Helpers ---
 void start_training_with_dataset(NeuralNetwork *network, const char *path);
 void test_score_dataset(NeuralNetwork *network, const char *path);
 

@@ -16,7 +16,6 @@ void free_grid(char **grid, size_t size) {
   free(grid);
 }
 
-// Helper to draw a line on SDL_Surface
 void draw_line(SDL_Surface *surface, int x1, int y1, int x2, int y2,
                Uint32 color) {
   int dx = abs(x2 - x1);
@@ -55,7 +54,6 @@ void draw_line(SDL_Surface *surface, int x1, int y1, int x2, int y2,
   }
 }
 
-// Helper to draw a rectangle outline on SDL_Surface
 void draw_rect(SDL_Surface *surface, int x, int y, int w, int h, Uint32 color) {
   // Top and Bottom
   draw_line(surface, x, y, x + w, y, color);
@@ -84,7 +82,6 @@ int main(int argc, char *argv[]) {
 
   const char *is_median = argv[2];
 
-  // PRE-FILTERING: Load, Grayscale, Median Filter, Save
   printf("Applying pre-rotation median filter...\n");
   SDL_Surface *initial = IMG_Load(inPath);
   if (!initial) {
@@ -92,7 +89,6 @@ int main(int argc, char *argv[]) {
          IMG_GetError());
   }
 
-  // Convert to consistent format (ARGB8888)
   SDL_Surface *conv =
       SDL_ConvertSurfaceFormat(initial, SDL_PIXELFORMAT_ARGB8888, 0);
   SDL_FreeSurface(initial);
@@ -111,7 +107,6 @@ int main(int argc, char *argv[]) {
   }
   SDL_FreeSurface(conv);
 
-  // Use the filtered image for rotation
   if (automatic_rotate(filteredPath, "temp/rotated.bmp") != 0)
     return 1;
 
@@ -137,17 +132,17 @@ int main(int argc, char *argv[]) {
     int row_len = result->grid_lines[i].letter_count;
     grid[i] = malloc(
         sizeof(char) *
-        (row_len + 1)); // +1 for null terminator if we want to print as string
+        (row_len + 1)); 
 
     for (int j = 0; j < row_len; j++) {
       char *path = result->grid_lines[i].letters[j].path;
       double *inputs = img_to_binary_matrix(path);
       if (inputs) {
         int pred = predict(&network, inputs);
-        grid[i][j] = (char)(pred + 'A'); // Assume A-Z mapping
+        grid[i][j] = (char)(pred + 'A'); 
         free(inputs);
       } else {
-        grid[i][j] = '?'; // Error placeholder
+        grid[i][j] = '?'; 
       }
     }
     grid[i][row_len] = '\0';
@@ -204,11 +199,7 @@ int main(int argc, char *argv[]) {
   if (!vis_img) {
     warnx("Failed to load output/visualization.bmp to draw results");
   } else {
-    // Must convert to RGBA to ensure format matches drawings (or just MapRGB)
-    // Assuming it was saved as correct format or we use MapRGB.
-    // Since we just loaded it, let's use MapRGB.
 
-    // Color palette for different words
     Uint32 colors[] = {
         SDL_MapRGB(vis_img->format, 255, 0, 0),   // Red
         SDL_MapRGB(vis_img->format, 0, 255, 0),   // Green
@@ -241,7 +232,6 @@ int main(int argc, char *argv[]) {
         printf("Word '%s' found (mis=%d): (%zu, %zu) -> (%zu, %zu)\n", word,
                mismatches, start_c, start_r, end_c, end_r);
 
-        // Draw oriented box around the word
         if (start_r < (size_t)result->grid_line_count &&
             start_c < (size_t)result->grid_lines[start_r].letter_count &&
             end_r < (size_t)result->grid_line_count &&
@@ -249,7 +239,6 @@ int main(int argc, char *argv[]) {
           LetterPath start_lp = result->grid_lines[start_r].letters[start_c];
           LetterPath end_lp = result->grid_lines[end_r].letters[end_c];
 
-          // Corners
           int sx = start_lp.x;
           int sy = start_lp.y;
           int sw = start_lp.width;
@@ -259,7 +248,6 @@ int main(int argc, char *argv[]) {
           int ew = end_lp.width;
           int eh = end_lp.height;
 
-          // Determine direction to pick correct hull edges
           int dx = 0;
           if (end_c > start_c)
             dx = 1;
@@ -272,10 +260,8 @@ int main(int argc, char *argv[]) {
           else if (end_r < start_r)
             dy = -1;
 
-          // Apply padding (Adaptive)
-          // Apply padding (Adaptive)
+
           int pad = 6;
-          // Standard box inflation
           sx -= pad;
           sy -= pad;
           sw += 2 * pad;
@@ -285,7 +271,6 @@ int main(int argc, char *argv[]) {
           ew += 2 * pad;
           eh += 2 * pad;
 
-          // EXTRA LENGTH for Diagonals to avoid truncating extremities
           if (dx != 0 && dy != 0) {
             int len_pad = 12;
             sx -= dx * len_pad;
@@ -294,11 +279,11 @@ int main(int argc, char *argv[]) {
             ey += dy * len_pad;
           }
 
-          int x1_a, y1_a, x2_a, y2_a; // Side 1
-          int x1_b, y1_b, x2_b, y2_b; // Side 2
+          int x1_a, y1_a, x2_a, y2_a; 
+          int x1_b, y1_b, x2_b, y2_b;
 
-          if (dy == 0) {   // Horizontal
-            if (dx == 1) { // L -> R
+          if (dy == 0) {   
+            if (dx == 1) { 
               x1_a = sx;
               y1_a = sy;
               x2_a = ex + ew;
@@ -338,7 +323,6 @@ int main(int argc, char *argv[]) {
               y2_b = ey; // Right
             }
           } else { // Diagonal
-            // Main Diagonal-ish slope (TL-BR or BR-TL)
             if (dx * dy > 0) {
               x1_a = sx + sw;
               y1_a = sy;
@@ -349,7 +333,6 @@ int main(int argc, char *argv[]) {
               x2_b = ex;
               y2_b = ey + eh; // BL -> BL
             }
-            // Anti Diagonal-ish slope (TR-BL or BL-TR)
             else {
               x1_a = sx;
               y1_a = sy;
@@ -362,11 +345,10 @@ int main(int argc, char *argv[]) {
             }
           }
 
-          // Draw the 4 sides
           draw_line(vis_img, x1_a, y1_a, x2_a, y2_a, color); // Side 1
           draw_line(vis_img, x1_b, y1_b, x2_b, y2_b, color); // Side 2
-          draw_line(vis_img, x1_a, y1_a, x1_b, y1_b, color); // Cap 1 (Start)
-          draw_line(vis_img, x2_a, y2_a, x2_b, y2_b, color); // Cap 2 (End)
+          draw_line(vis_img, x1_a, y1_a, x1_b, y1_b, color); // Cap 1
+          draw_line(vis_img, x2_a, y2_a, x2_b, y2_b, color); // Cap 2 
         }
 
       } else {
@@ -374,7 +356,6 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    // Save the result
     if (SDL_SaveBMP(vis_img, "output/solved.bmp") != 0) {
       warnx("Failed to save output/solved.bmp: %s", SDL_GetError());
     } else {
@@ -384,10 +365,8 @@ int main(int argc, char *argv[]) {
     SDL_FreeSurface(vis_img);
   }
 
-  // Free solver grid
   free_grid(solver_grid, grid_rows);
 
-  // Free resources
   free_grid(grid, grid_rows);
   free_grid(words, word_count);
   free_segmentation_result(result);

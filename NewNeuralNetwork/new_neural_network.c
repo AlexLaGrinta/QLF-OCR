@@ -284,7 +284,7 @@ void train_network(NeuralNetwork *network, SampleData **dataset,
 }
 
 // ============================================================================
-// PREDICTION & IO
+// PREDICTION 
 // ============================================================================
 
 int predict(NeuralNetwork *network, double *inputs) {
@@ -310,7 +310,6 @@ int predict(NeuralNetwork *network, double *inputs) {
   return max_index;
 }
 
-// Struct serialization (memory compatible only if struct padding same)
 void save_network_weights(NeuralNetwork *network, const char *path) {
   FILE *f = fopen(path, "wb");
   if (f) {
