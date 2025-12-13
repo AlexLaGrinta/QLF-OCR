@@ -6,30 +6,24 @@ TARGET = ocr_gui
 SRC = interface.c
 OBJ = $(SRC:.c=.o)
 
-# === Règle par défaut ===
 all: $(TARGET)
 
 .INTERMEDIATE: $(OBJ)
 
-# === Compilation de l’exécutable ===
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -o $(TARGET) $(OBJ) $(LIBS)
-	$(MAKE) -C ../
 
-# === Compilation des fichiers objets ===
+
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# === Nettoyage ===
 clean:
 	rm -f $(OBJ) $(TARGET)
 	rm -rf ../ocr
 	rm -rf ../output
 
-# === Recompilation complète ===
 re: clean all
 
-# === Règle pratique pour exécuter directement ===
 run: all
 	./$(TARGET)
 

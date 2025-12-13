@@ -38,13 +38,11 @@ int main(int argc, char *argv[]) {
   GtkWidget *btn_ocr = gtk_button_new_with_label("OCR");
   GtkWidget *btn_save = gtk_button_new_with_label("Sauvegarder");
 
-
   gtk_box_pack_start(GTK_BOX(hbox_top), btn_open, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(hbox_top), btn_ocr, FALSE, FALSE, 0);
 
   GtkWidget *chk_median = gtk_check_button_new_with_label("Filtre Médian");
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(chk_median),
-                               TRUE); 
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(chk_median), TRUE);
   gtk_box_pack_start(GTK_BOX(hbox_top), chk_median, FALSE, FALSE, 0);
 
   gtk_box_pack_start(GTK_BOX(hbox_top), btn_save, FALSE, FALSE, 0);
@@ -97,7 +95,7 @@ static void apply_dark_theme(GtkWidget *window) {
 }
 
 static void on_open_clicked(GtkWidget *widget, gpointer data) {
-  system("rm -rf ../output");
+  system("rm -rf output/");
   AppWidgets *app = data;
   GtkWidget *dialog = gtk_file_chooser_dialog_new(
       "Choisir une image", GTK_WINDOW(app->window),
@@ -189,8 +187,8 @@ static void on_ocr_clicked(GtkWidget *widget, gpointer data) {
   gboolean use_median =
       gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->chk_median));
   char command[2048];
-  snprintf(command, sizeof(command), "cd .. && ./ocr \"%s\" %d",
-           app->image_path, use_median ? 1 : 0);
+  snprintf(command, sizeof(command), "./ocr \"%s\" %d", app->image_path,
+           use_median ? 1 : 0);
 
   g_print("Executing: %s\n", command);
   int ret = system(command);
@@ -199,7 +197,7 @@ static void on_ocr_clicked(GtkWidget *widget, gpointer data) {
     g_print("Error executing OCR solver (code %d).\n", ret);
     return;
   }
-  const char *result_path = "../output/solved.bmp";
+  const char *result_path = "output/solved.bmp";
 
   if (app->pixbuf_display)
     g_object_unref(app->pixbuf_display);

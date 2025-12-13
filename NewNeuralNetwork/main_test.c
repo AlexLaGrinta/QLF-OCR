@@ -13,27 +13,18 @@ void test_letter(NeuralNetwork *network, const char *path) {
 }
 
 int main() {
-  printf("=== TESTING NEW NEURAL NETWORK ===\n");
+  printf("=== NEW NEURAL NETWORK ===\n");
 
-  // Seed random for reproducibility
   srand(42);
 
   NeuralNetwork network;
 
   printf("\n1. Training Network...\n");
-  // Training on the uppercase dataset (using relative path to dataset root)
-  // Ensure the path is correct. User has 'dataset_oat' and 'dataset_uppercase'
-  // Let's use dataset_uppercase as per previous attempts or ask user?
-  // User context showed 'dataset_uppercase' in .gitignore.
-  // The commented out code said "../NeuralNetwork/dataset_oat", but usually
-  // it's "../dataset/dataset_uppercase" Let's stick to
-  // "../dataset/dataset_uppercase" as in the original file I wrote. Wait, the
-  // viewed file has "../NeuralNetwork/dataset_oat". Let's check where the
-  // dataset actually is.
+
   start_training_with_dataset(&network, "../NeuralNetwork/dataset_oat");
 
   printf("\n2. Saving Weights...\n");
-  save_network_weights(&network, "new_model_weights.bin");
+  save_network_weights(&network, "final_model_weights.bin");
 
   // test_letter(&network, "letter_0334j.png");
 
