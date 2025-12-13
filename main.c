@@ -66,8 +66,8 @@ void draw_rect(SDL_Surface *surface, int x, int y, int w, int h, Uint32 color) {
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 2) {
-    errx(EXIT_FAILURE, "Utilisation : ./ocr {image}");
+  if (argc != 3) {
+    errx(EXIT_FAILURE, "Utilisation : ./ocr {image} {median_filter}");
   }
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -81,6 +81,8 @@ int main(int argc, char *argv[]) {
   atexit(IMG_Quit);
 
   const char *inPath = argv[1];
+
+  const char *is_median = argv[2];
 
   // PRE-FILTERING: Load, Grayscale, Median Filter, Save
   printf("Applying pre-rotation median filter...\n");
@@ -99,7 +101,9 @@ int main(int argc, char *argv[]) {
   }
 
   grayscale_inplace(conv);
-  median_filter(conv);
+  if (strcmp(is_median, "1") == 0) {
+    median_filter(conv);
+  }
 
   const char *filteredPath = "temp/filtered_input.bmp";
   if (SDL_SaveBMP(conv, filteredPath) != 0) {

@@ -9,6 +9,7 @@ typedef struct {
   GtkWidget *window;
   GdkPixbuf *pixbuf_original;
   GdkPixbuf *pixbuf_display;
+  GtkWidget *chk_median;
 } AppWidgets;
 
 static void on_open_clicked(GtkWidget *widget, gpointer data);
@@ -40,6 +41,13 @@ int main(int argc, char *argv[]) {
 
   gtk_box_pack_start(GTK_BOX(hbox_top), btn_open, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX(hbox_top), btn_ocr, FALSE, FALSE, 0);
+
+  // Median Filter Checkbox
+  GtkWidget *chk_median = gtk_check_button_new_with_label("Filtre Médian");
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(chk_median),
+                               TRUE); // Default ON
+  gtk_box_pack_start(GTK_BOX(hbox_top), chk_median, FALSE, FALSE, 0);
+
   gtk_box_pack_start(GTK_BOX(hbox_top), btn_save, FALSE, FALSE, 0);
   // gtk_box_pack_end(GTK_BOX(hbox_top), btn_fullscreen, FALSE, FALSE, 0);
 
@@ -53,7 +61,9 @@ int main(int argc, char *argv[]) {
   app->window = window;
   app->pixbuf_original = NULL;
   app->pixbuf_display = NULL;
+  app->pixbuf_display = NULL;
   app->image_path[0] = '\0';
+  app->chk_median = chk_median;
 
   g_signal_connect(btn_open, "clicked", G_CALLBACK(on_open_clicked), app);
   g_signal_connect(btn_save, "clicked", G_CALLBACK(on_save_clicked), app);
@@ -210,8 +220,11 @@ static void on_ocr_clicked(GtkWidget *widget, gpointer data) {
   if (!app->pixbuf_original || strlen(app->image_path) == 0)
     return;
 
+  gboolean use_median =
+      gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->chk_median));
   char command[2048];
-  snprintf(command, sizeof(command), "cd .. && ./ocr \"%s\"", app->image_path);
+  snprintf(command, sizeof(command), "cd .. && ./ocr \"%s\" %d",
+           app->image_path, use_median ? 1 : 0);
 
   g_print("Executing: %s\n", command);
   int ret = system(command);
