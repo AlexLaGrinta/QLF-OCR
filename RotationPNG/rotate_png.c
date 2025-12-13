@@ -184,38 +184,40 @@ int automatic_rotate(const char *input_path, const char *output_path) {
 
 /*
 int main(int argc, char *argv[]) {
-    if (argc != 4) {
-        fprintf(stderr, "Usage: %s input.png angle|auto output.bmp\n", argv[0]);
-        return 1;
-    }
+  if (argc != 4) {
+    fprintf(stderr, "Usage: %s input.png angle|auto output.bmp\n", argv[0]);
+    return 1;
+  }
 
-    const char *input_path = argv[1];
-    const char *angle_arg = argv[2];
-    const char *output_path = argv[3];
-    GError *err = NULL;
+  const char *input_path = argv[1];
+  const char *angle_arg = argv[2];
+  const char *output_path = argv[3];
+  GError *err = NULL;
 
-    GdkPixbuf *src = gdk_pixbuf_new_from_file(input_path, &err);
-    if (!src) {
-        fprintf(stderr, "%s\n", err->message);
-        g_error_free(err);
-        return 1;
-    }
+  GdkPixbuf *src = gdk_pixbuf_new_from_file(input_path, &err);
+  if (!src) {
+    fprintf(stderr, "%s\n", err->message);
+    g_error_free(err);
+    return 1;
+  }
 
-    double angle;
-    if (strcmp(angle_arg, "auto") == 0) angle = detect_skew_angle(src);
-    else angle = atof(angle_arg);
+  double angle;
+  if (strcmp(angle_arg, "auto") == 0)
+    angle = detect_skew_angle(src);
+  else
+    angle = atof(angle_arg);
 
-    GdkPixbuf *rotated = rotate_pixbuf_bilinear_fixed(src, angle);
-    if (!gdk_pixbuf_save(rotated, output_path, "bmp", &err, NULL)) {
-        fprintf(stderr, "%s\n", err->message);
-        g_error_free(err);
-        g_object_unref(src);
-        g_object_unref(rotated);
-        return 1;
-    }
-
+  GdkPixbuf *rotated = rotate_pixbuf_bilinear_fixed(src, angle);
+  if (!gdk_pixbuf_save(rotated, output_path, "bmp", &err, NULL)) {
+    fprintf(stderr, "%s\n", err->message);
+    g_error_free(err);
     g_object_unref(src);
     g_object_unref(rotated);
-    return 0;
+    return 1;
+  }
+
+  g_object_unref(src);
+  g_object_unref(rotated);
+  return 0;
 }
 */

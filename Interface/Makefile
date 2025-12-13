@@ -23,6 +23,8 @@ $(TARGET): $(OBJ)
 # === Nettoyage ===
 clean:
 	rm -f $(OBJ) $(TARGET)
+	rm -rf ../ocr
+	rm -rf ../output
 
 # === Recompilation complète ===
 re: clean all

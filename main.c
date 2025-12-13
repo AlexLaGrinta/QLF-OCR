@@ -82,7 +82,33 @@ int main(int argc, char *argv[]) {
 
   const char *inPath = argv[1];
 
-  if (automatic_rotate(inPath, "temp/rotated.bmp") != 0)
+  // PRE-FILTERING: Load, Grayscale, Median Filter, Save
+  printf("Applying pre-rotation median filter...\n");
+  SDL_Surface *initial = IMG_Load(inPath);
+  if (!initial) {
+    errx(EXIT_FAILURE, "Failed to load input image for pre-filtering: %s",
+         IMG_GetError());
+  }
+
+  // Convert to consistent format (ARGB8888)
+  SDL_Surface *conv =
+      SDL_ConvertSurfaceFormat(initial, SDL_PIXELFORMAT_ARGB8888, 0);
+  SDL_FreeSurface(initial);
+  if (!conv) {
+    errx(EXIT_FAILURE, "Pre-filter conversion failed: %s", SDL_GetError());
+  }
+
+  grayscale_inplace(conv);
+  median_filter(conv);
+
+  const char *filteredPath = "temp/filtered_input.bmp";
+  if (SDL_SaveBMP(conv, filteredPath) != 0) {
+    errx(EXIT_FAILURE, "Failed to save pre-filtered image: %s", SDL_GetError());
+  }
+  SDL_FreeSurface(conv);
+
+  // Use the filtered image for rotation
+  if (automatic_rotate(filteredPath, "temp/rotated.bmp") != 0)
     return 1;
 
   if (preprocess_image("temp/rotated.bmp", "rotated_proprocessed.bmp") != 0)
@@ -235,11 +261,34 @@ int main(int argc, char *argv[]) {
             dx = 1;
           else if (end_c < start_c)
             dx = -1;
+
           int dy = 0;
           if (end_r > start_r)
             dy = 1;
           else if (end_r < start_r)
             dy = -1;
+
+          // Apply padding (Adaptive)
+          // Apply padding (Adaptive)
+          int pad = 6;
+          // Standard box inflation
+          sx -= pad;
+          sy -= pad;
+          sw += 2 * pad;
+          sh += 2 * pad;
+          ex -= pad;
+          ey -= pad;
+          ew += 2 * pad;
+          eh += 2 * pad;
+
+          // EXTRA LENGTH for Diagonals to avoid truncating extremities
+          if (dx != 0 && dy != 0) {
+            int len_pad = 12;
+            sx -= dx * len_pad;
+            sy -= dy * len_pad;
+            ex += dx * len_pad;
+            ey += dy * len_pad;
+          }
 
           int x1_a, y1_a, x2_a, y2_a; // Side 1
           int x1_b, y1_b, x2_b, y2_b; // Side 2
