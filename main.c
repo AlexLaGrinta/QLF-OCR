@@ -67,7 +67,7 @@ void draw_rect(SDL_Surface *surface, int x, int y, int w, int h, Uint32 color) {
 
 int main(int argc, char *argv[]) {
   if (argc != 2) {
-    errx(EXIT_FAILURE, "Utilisation : ./selem {image}");
+    errx(EXIT_FAILURE, "Utilisation : ./ocr {image}");
   }
 
   if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -170,7 +170,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Load visualization image
-  SDL_Surface *vis_img = IMG_Load("output/visualization.bmp");
+  SDL_Surface *vis_img = IMG_Load("temp/rotated.bmp");
   if (!vis_img) {
     warnx("Failed to load output/visualization.bmp to draw results");
   } else {

@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -O2 -Wall -Wextra `pkg-config --cflags gdk-pixbuf-2.0` -DNO_MAIN_SOLVER
 LIBS = `pkg-config --libs gdk-pixbuf-2.0` -lm -lSDL2 -lSDL2_image
 
-TARGET = selem
+TARGET = ocr
 SRC = main.c \
       Preprocessing/preprocessing.c \
       RotationPNG/rotate_png.c \
