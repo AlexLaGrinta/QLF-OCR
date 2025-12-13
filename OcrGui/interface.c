@@ -15,6 +15,8 @@ typedef struct {
 static void on_open_clicked(GtkWidget *widget, gpointer data);
 static void on_save_clicked(GtkWidget *widget, gpointer data);
 static void on_ocr_clicked(GtkWidget *widget, gpointer data);
+
+static void on_segmentation_clicked(GtkWidget *widget, gpointer data);
 static void apply_dark_theme(GtkWidget *window);
 static void on_fullscreen_toggle(GtkWidget *widget, gpointer data);
 
@@ -36,6 +38,7 @@ int main(int argc, char *argv[]) {
 
   GtkWidget *btn_open = gtk_button_new_with_label("Ouvrir une image");
   GtkWidget *btn_ocr = gtk_button_new_with_label("OCR");
+  GtkWidget *btn_segmentation = gtk_button_new_with_label("Segmentation");
   GtkWidget *btn_save = gtk_button_new_with_label("Sauvegarder");
 
   gtk_box_pack_start(GTK_BOX(hbox_top), btn_open, FALSE, FALSE, 0);
@@ -46,6 +49,7 @@ int main(int argc, char *argv[]) {
   gtk_box_pack_start(GTK_BOX(hbox_top), chk_median, FALSE, FALSE, 0);
 
   gtk_box_pack_start(GTK_BOX(hbox_top), btn_save, FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX(hbox_top), btn_segmentation, FALSE, FALSE, 0);
 
   GtkWidget *image_preview = gtk_image_new();
   gtk_widget_set_halign(image_preview, GTK_ALIGN_CENTER);
@@ -63,7 +67,10 @@ int main(int argc, char *argv[]) {
 
   g_signal_connect(btn_open, "clicked", G_CALLBACK(on_open_clicked), app);
   g_signal_connect(btn_save, "clicked", G_CALLBACK(on_save_clicked), app);
+
   g_signal_connect(btn_ocr, "clicked", G_CALLBACK(on_ocr_clicked), app);
+  g_signal_connect(btn_segmentation, "clicked",
+                   G_CALLBACK(on_segmentation_clicked), app);
 
   gtk_widget_show_all(window);
   gtk_main();
@@ -214,4 +221,37 @@ static void on_ocr_clicked(GtkWidget *widget, gpointer data) {
 
   gtk_image_set_from_pixbuf(GTK_IMAGE(app->image_preview), app->pixbuf_display);
   g_print("OCR finished. Displaying result.\n");
+}
+
+static void on_segmentation_clicked(GtkWidget *widget, gpointer data) {
+  (void)widget; // Unused
+  AppWidgets *app = data;
+  const char *viz_path = "output/visualization.bmp";
+
+  GError *error = NULL;
+  GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file(viz_path, &error);
+
+  if (!pixbuf) {
+    g_print("Error loading segmentation visualization: %s\n",
+            error ? error->message : "unknown");
+    if (error)
+      g_error_free(error);
+
+    // Optional: Show error dialog
+    GtkWidget *dialog = gtk_message_dialog_new(
+        GTK_WINDOW(app->window), GTK_DIALOG_DESTROY_WITH_PARENT,
+        GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE,
+        "Image de segmentation non trouvée (%s).\nAvez-vous lancé l'OCR ?",
+        viz_path);
+    gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+    return;
+  }
+
+  if (app->pixbuf_display)
+    g_object_unref(app->pixbuf_display);
+
+  app->pixbuf_display = pixbuf;
+  gtk_image_set_from_pixbuf(GTK_IMAGE(app->image_preview), app->pixbuf_display);
+  g_print("Loaded segmentation visualization from %s\n", viz_path);
 }
