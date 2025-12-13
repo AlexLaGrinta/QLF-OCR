@@ -305,9 +305,9 @@ Character *split_merged_characters(Character *chars, int *num_chars) {
     // stick to width first as requested. User said: "si tu trouves une lettre
     // qui est trop grand essaye de la diviser en deux"
 
-    if (avg_w > 0 && ch.width > 3.0 * avg_w &&
+    if (avg_w > 0 && ch.width > 2.0 * avg_w &&
         ch.width >
-            20) { // arbitrary absolute min width to avoid splitting tiny noise
+            15) { // arbitrary absolute min width to avoid splitting tiny noise
       // Try to find a split point
       // Look in the middle 50%
       int start_search = ch.width * 0.25;
@@ -616,7 +616,7 @@ Character *filter_letters(Character *chars, int *num_chars) {
       // ----------------------------------------------------------------
       if (valid) {
         // Rejeter si trop petit pour être une lettre
-        if (h < 5 && w < 5) {
+        if (h < 5 && w < 3) {
           valid = false;
           grid_filtered_single++;
         }
@@ -631,7 +631,7 @@ Character *filter_letters(Character *chars, int *num_chars) {
       // ----------------------------------------------------------------
       // CRITÈRE 3: Surface minimale ULTRA RENFORCÉE
       // ----------------------------------------------------------------
-      if (valid && area < 8) {
+      if (valid && area < 6) {
         valid = false;
         grid_filtered_single++;
       }
@@ -639,7 +639,7 @@ Character *filter_letters(Character *chars, int *num_chars) {
       // ----------------------------------------------------------------
       // CRITÈRE 4: Hauteur minimale ULTRA STRICTE
       // ----------------------------------------------------------------
-      if (valid && h < 6) {
+      if (valid && h < 5) {
         // Exception uniquement pour les caractères TRÈS larges (-, =, _)
         if (w < 10) {
           valid = false;
@@ -1295,7 +1295,7 @@ Character *filter_letters(Character *chars, int *num_chars) {
 
       float median_h = heights[h_count / 2];
       float min_h_threshold =
-          median_h * 0.45f; // Tightened to 0.45 as requested (more restrictive)
+          median_h * 0.30f; // Relaxed to 0.30 to keep small lowercase
       float max_h_threshold = median_h * 2.00f; // Stricter for titles
 
       if (min_h_threshold < 4)
@@ -1427,8 +1427,8 @@ Character *filter_letters(Character *chars, int *num_chars) {
         if (chars[i].zone == ZONE_WORDLIST && chars[i].data != NULL) {
           if (component[i] != -1) {
             int size = comp_sizes[component[i]];
-            // Keep if size >= 3 (minimum word length approximation)
-            if (size < 3) {
+            // Keep if size >= 1 (keep all valid clusters, even single letters)
+            if (size < 1) {
               // Mark for removal
               if (chars[i].data)
                 free(chars[i].data);
