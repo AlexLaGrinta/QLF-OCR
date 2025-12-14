@@ -192,10 +192,17 @@ int main(int argc, char *argv[]) {
   }
 
   // Load visualization image
-  SDL_Surface *vis_img = IMG_Load("temp/rotated.bmp");
-  if (!vis_img) {
+  SDL_Surface *loaded_vis_img = IMG_Load("temp/rotated.bmp");
+  SDL_Surface *vis_img = NULL;
+  
+  if (!loaded_vis_img) {
     warnx("Failed to load output/visualization.bmp to draw results");
   } else {
+    vis_img = SDL_ConvertSurfaceFormat(loaded_vis_img, SDL_PIXELFORMAT_ARGB8888, 0);
+    SDL_FreeSurface(loaded_vis_img);
+  }
+
+  if (vis_img) {
 
     Uint32 colors[] = {
         SDL_MapRGB(vis_img->format, 255, 0, 0),   // Red
