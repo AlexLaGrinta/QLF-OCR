@@ -82,7 +82,6 @@ int main(int argc, char *argv[]) {
 
   const char *is_median = argv[2];
 
-  printf("Applying pre-rotation median filter...\n");
   SDL_Surface *initial = IMG_Load(inPath);
   if (!initial) {
     errx(EXIT_FAILURE, "Failed to load input image for pre-filtering: %s",
@@ -130,19 +129,17 @@ int main(int argc, char *argv[]) {
 
   for (int i = 0; i < grid_rows; i++) {
     int row_len = result->grid_lines[i].letter_count;
-    grid[i] = malloc(
-        sizeof(char) *
-        (row_len + 1)); 
+    grid[i] = malloc(sizeof(char) * (row_len + 1));
 
     for (int j = 0; j < row_len; j++) {
       char *path = result->grid_lines[i].letters[j].path;
       double *inputs = img_to_binary_matrix(path);
       if (inputs) {
         int pred = predict(&network, inputs);
-        grid[i][j] = (char)(pred + 'A'); 
+        grid[i][j] = (char)(pred + 'A');
         free(inputs);
       } else {
-        grid[i][j] = '?'; 
+        grid[i][j] = '?';
       }
     }
     grid[i][row_len] = '\0';
@@ -260,7 +257,6 @@ int main(int argc, char *argv[]) {
           else if (end_r < start_r)
             dy = -1;
 
-
           int pad = 6;
           sx -= pad;
           sy -= pad;
@@ -279,11 +275,11 @@ int main(int argc, char *argv[]) {
             ey += dy * len_pad;
           }
 
-          int x1_a, y1_a, x2_a, y2_a; 
+          int x1_a, y1_a, x2_a, y2_a;
           int x1_b, y1_b, x2_b, y2_b;
 
-          if (dy == 0) {   
-            if (dx == 1) { 
+          if (dy == 0) {
+            if (dx == 1) {
               x1_a = sx;
               y1_a = sy;
               x2_a = ex + ew;
@@ -332,8 +328,7 @@ int main(int argc, char *argv[]) {
               y1_b = sy + sh;
               x2_b = ex;
               y2_b = ey + eh; // BL -> BL
-            }
-            else {
+            } else {
               x1_a = sx;
               y1_a = sy;
               x2_a = ex;
@@ -348,7 +343,7 @@ int main(int argc, char *argv[]) {
           draw_line(vis_img, x1_a, y1_a, x2_a, y2_a, color); // Side 1
           draw_line(vis_img, x1_b, y1_b, x2_b, y2_b, color); // Side 2
           draw_line(vis_img, x1_a, y1_a, x1_b, y1_b, color); // Cap 1
-          draw_line(vis_img, x2_a, y2_a, x2_b, y2_b, color); // Cap 2 
+          draw_line(vis_img, x2_a, y2_a, x2_b, y2_b, color); // Cap 2
         }
 
       } else {

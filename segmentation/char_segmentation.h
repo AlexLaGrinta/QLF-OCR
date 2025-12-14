@@ -28,7 +28,6 @@ typedef struct {
   int x, y, width, height;
 } Word;
 
-// Nouvelle fonction
 Word *group_characters_into_words(Character *chars, int num_chars,
                                   int *num_words);
 void free_words(Word *words, int num_words);

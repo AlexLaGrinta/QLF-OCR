@@ -56,7 +56,6 @@ int preprocess_image(const char *path, const char *outName) {
   // median_filter(img);
 
   uint8_t th = otsu_threshold(img);
-  fprintf(stdout, "Otsu threshold = %u\n", th);
 
   threshold_inplace(img, th, 0);
 
